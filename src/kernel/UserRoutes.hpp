@@ -11,7 +11,7 @@
 
 namespace Softadastra
 {
-    class UserRoutes: public IRoutes
+    class UserRoutes : public IRoutes
     {
     public:
         void configure(Softadastra::Router &router) override
