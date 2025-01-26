@@ -34,9 +34,19 @@ namespace Softadastra
             // Capture le socket dans un shared_ptr et le passe au ThreadPool
             auto socket_ptr = std::make_shared<tcp::socket>(std::move(socket));
 
-            // Enqueue la tâche dans le pool de threads, et passer le shared_ptr
-            pool.enqueue([this, socket_ptr, &router = router_]()
-                         { handle_client(socket_ptr, router); });
+            // Enqueue la tâche dans le pool de threads
+            if (!pool.enqueue([this, socket_ptr, &router = router_]()
+                              { handle_client(socket_ptr, router); }))
+            {
+                // Si la tâche a été rejetée, envoyer une réponse HTTP 503 (Service Unavailable)
+                http::response<http::string_body> res;
+                res.result(http::status::service_unavailable);
+                res.set(http::field::content_type, "application/json");
+                res.body() = R"({"error": "Server is overloaded, try again later."})";
+
+                http::write(*socket_ptr, res);
+                socket_ptr->shutdown(tcp::socket::shutdown_both);
+            }
         }
     }
 
