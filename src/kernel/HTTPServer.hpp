@@ -65,7 +65,7 @@ namespace Softadastra
          * @param socket Le socket de la connexion client.
          * @param router Le routeur utilisé pour acheminer les requêtes HTTP.
          */
-        void handle_client(tcp::socket socket, Router &router);
+        void handle_client(std::shared_ptr<tcp::socket> socket_ptr, Router &router);
 
         Config &config_;                                        ///< Référence à la configuration du serveur.
         std::unique_ptr<net::io_context> io_context_;           ///< Contexte d'entrée/sortie pour le serveur.
