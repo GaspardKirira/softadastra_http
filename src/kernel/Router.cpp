@@ -4,7 +4,6 @@
 
 namespace Softadastra
 {
-
     void Router::add_route(http::verb method, const std::string &route, std::shared_ptr<IRequestHandler> handler)
     {
         routes_[{method, route}] = std::move(handler);
@@ -18,13 +17,13 @@ namespace Softadastra
         auto it = routes_.find(key);
         if (it != routes_.end())
         {
-            std::cout << "Exact match found!" << std::endl;
+            spdlog::info("Exact match found!");
             it->second->handle_request(req, res);
             return true;
         }
 
         // Recherche de route dynamique
-        std::cout << "Exact match not found, trying dynamic routes..." << std::endl;
+        spdlog::info("Exact match not found, trying dynamic routes...");
 
         for (auto &[route_key, handler] : routes_)
         {
@@ -34,7 +33,24 @@ namespace Softadastra
             }
         }
 
-        std::cout << "Route not found" << std::endl;
+        // Si aucune route n'a été trouvée, on envoie une réponse appropriée
+        spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
+
+        // Gestion des méthodes non prises en charge
+        if (req.method() != http::verb::get && req.method() != http::verb::post)
+        {
+            res.result(http::status::method_not_allowed); // 405 Method Not Allowed
+            res.set(http::field::content_type, "application/json");
+            res.body() = json{{"message", "Method Not Allowed"}}.dump();
+        }
+        else
+        {
+            // Si la route n'est pas trouvée, on renvoie 404
+            res.result(http::status::not_found);
+            res.set(http::field::content_type, "application/json");
+            res.body() = json{{"message", "Route not found"}}.dump();
+        }
+
         return false;
     }
 
@@ -92,15 +108,27 @@ namespace Softadastra
             // Valider les paramètres id et slug
             for (const auto &[key, value] : params)
             {
-                if (key == "id" && !std::regex_match(value, std::regex("^[0-9]+$")))
+                if (key == "id")
                 {
-                    spdlog::warn("Invalid 'id' parameter: {}", value);
-                    throw std::invalid_argument("Invalid parameter value for 'id'. Must be a positive integer.");
+                    if (!std::regex_match(value, std::regex("^[0-9]+$")))
+                    {
+                        spdlog::warn("Invalid 'id' parameter: {}", value);
+                        res.result(http::status::bad_request);
+                        res.set(http::field::content_type, "application/json");
+                        res.body() = json{{"message", "Invalid 'id' parameter. Must be a positive integer."}}.dump();
+                        return false;
+                    }
                 }
-                if (key == "slug" && !std::regex_match(value, std::regex("^[a-zA-Z0-9_-]+$")))
+                if (key == "slug")
                 {
-                    spdlog::warn("Invalid 'slug' parameter: {}", value);
-                    throw std::invalid_argument("Invalid parameter value for 'slug'. Must be alphanumeric.");
+                    if (!std::regex_match(value, std::regex("^[a-zA-Z0-9_-]+$")))
+                    {
+                        spdlog::warn("Invalid 'slug' parameter: {}", value);
+                        res.result(http::status::bad_request);
+                        res.set(http::field::content_type, "application/json");
+                        res.body() = json{{"message", "Invalid 'slug' parameter. Must be alphanumeric."}}.dump();
+                        return false;
+                    }
                 }
             }
 
