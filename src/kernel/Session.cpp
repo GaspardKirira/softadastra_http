@@ -19,7 +19,7 @@ namespace Softadastra
             {
                 // Log d'erreur côté serveur
                 spdlog::warn("Request too large: {} bytes", req.body().size());
-                ResponseSender::send_error(socket_, "Request too large");
+                Response::send_error(socket_, "Request too large");
                 return;
             }
 
@@ -28,12 +28,12 @@ namespace Softadastra
             {
                 // Route non trouvée, envoie d'une erreur
                 spdlog::warn("Route not found for request: {}", req.target());
-                ResponseSender::send_error(socket_, "Route not found");
+                Response::send_error(socket_, "Route not found");
             }
             else
             {
                 // Réponse validée et envoyée
-                ResponseSender::send(socket_, res);
+                Response::send(socket_, res);
             }
         }
         catch (const std::exception &e)
@@ -41,7 +41,7 @@ namespace Softadastra
             // Log de l'erreur avec message envoyé au client
             spdlog::error("Error during session: {}", e.what());
             std::string error_msg = "Session Error: " + std::string(e.what());
-            ResponseSender::send_error(socket_, error_msg);
+            Response::send_error(socket_, error_msg);
             spdlog::warn("Sent error to client: {}", error_msg);
         }
     }

@@ -23,7 +23,7 @@
 #include "../config/Config.hpp"
 #include "Router.hpp"
 #include "Session.hpp"
-#include "ResponseSender.hpp"
+#include "Response.hpp"
 #include "../config/RouteConfigurator.hpp"
 
 namespace Softadastra

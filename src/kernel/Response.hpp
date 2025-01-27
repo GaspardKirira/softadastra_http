@@ -20,7 +20,7 @@ namespace Softadastra
      * ainsi que des erreurs sous forme de réponses HTTP, facilitant ainsi l'envoi de
      * réponses au client sur un socket TCP.
      */
-    class ResponseSender
+    class Response
     {
     public:
         /**
