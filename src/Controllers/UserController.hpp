@@ -5,14 +5,14 @@
 #include <string>
 #include <memory>
 #include <stdexcept>
-#include "IRoutes.hpp"
+#include "Controller.hpp"
 
 namespace Softadastra
 {
-    class UserController : public IRoutes
+    class UserController : public Controller
     {
     public:
-        void configure(Softadastra::Router &router) override
+        void configure(Router &router) override
         {
             router.add_route(http::verb::get, "/users/{id}",
                              std::static_pointer_cast<IRequestHandler>(

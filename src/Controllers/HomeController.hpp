@@ -6,13 +6,13 @@
 #include <memory>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
-#include "IRoutes.hpp"
+#include "Controller.hpp"
 
 using json = nlohmann::json;
 
 namespace Softadastra
 {
-    class HomeController : public IRoutes
+    class HomeController : public Controller
     {
     public:
         void configure(Router &routes) override

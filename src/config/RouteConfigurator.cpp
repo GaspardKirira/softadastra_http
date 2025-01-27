@@ -1,9 +1,7 @@
-#include "../ProductController.hpp"
-#include "../UserController.hpp"
-#include "../HomeController.hpp"
-#include <memory>
-
 #include "RouteConfigurator.hpp"
+#include "../Controllers/ProductController.hpp"
+#include "../Controllers/UserController.hpp"
+#include "../Controllers/HomeController.hpp"
 
 namespace Softadastra
 {

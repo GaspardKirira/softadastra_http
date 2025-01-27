@@ -41,7 +41,7 @@ include_directories(${CMAKE_SOURCE_DIR}/src/config)
 
 # Ajouter tous les fichiers .cpp dans src et src/config
 # Assure-toi que Config.cpp est bien inclus
-file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/config/*.cpp)
+file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/config/*.cpp src/config/RouteConfigurator.cpp)
 
 # Ajouter l'exécutable et spécifier les fichiers sources
 add_executable(prog ${SOURCE_FILES})
