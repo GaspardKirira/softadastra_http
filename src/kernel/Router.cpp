@@ -11,9 +11,18 @@ namespace Softadastra
 
     bool Router::handle_request(const http::request<http::string_body> &req, http::response<http::string_body> &res)
     {
-        RouteKey key = {req.method(), std::string(req.target())};
+        // Gestion des méthodes non prises en charge
+        if (req.method() != http::verb::get && req.method() != http::verb::post)
+        {
+            spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
+            res.result(http::status::method_not_allowed); // 405 Method Not Allowed
+            res.set(http::field::content_type, "application/json");
+            res.body() = json{{"message", "Method Not Allowed"}}.dump();
+            return false;
+        }
 
         // Recherche de la route exacte
+        RouteKey key = {req.method(), std::string(req.target())};
         auto it = routes_.find(key);
         if (it != routes_.end())
         {
@@ -24,32 +33,19 @@ namespace Softadastra
 
         // Recherche de route dynamique
         spdlog::info("Exact match not found, trying dynamic routes...");
-
         for (auto &[route_key, handler] : routes_)
         {
-            if (matches_dynamic_route(route_key.second, std::string(req.target()), handler, res))
+            if (matches_dynamic_route(route_key.second, std::string(req.target()), handler, res, req))
             {
                 return true;
             }
         }
 
-        // Si aucune route n'a été trouvée, on envoie une réponse appropriée
+        // Si aucune route n'a été trouvée, on renvoie 404
         spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
-
-        // Gestion des méthodes non prises en charge
-        if (req.method() != http::verb::get && req.method() != http::verb::post)
-        {
-            res.result(http::status::method_not_allowed); // 405 Method Not Allowed
-            res.set(http::field::content_type, "application/json");
-            res.body() = json{{"message", "Method Not Allowed"}}.dump();
-        }
-        else
-        {
-            // Si la route n'est pas trouvée, on renvoie 404
-            res.result(http::status::not_found);
-            res.set(http::field::content_type, "application/json");
-            res.body() = json{{"message", "Route not found"}}.dump();
-        }
+        res.result(http::status::not_found); // 404 Not Found
+        res.set(http::field::content_type, "application/json");
+        res.body() = json{{"message", "Route not found"}}.dump();
 
         return false;
     }
@@ -72,7 +68,7 @@ namespace Softadastra
         return result;
     }
 
-    bool Router::matches_dynamic_route(const std::string &route_pattern, const std::string &path, std::shared_ptr<IRequestHandler> handler, http::response<http::string_body> &res)
+    bool Router::matches_dynamic_route(const std::string &route_pattern, const std::string &path, std::shared_ptr<IRequestHandler> handler, http::response<http::string_body> &res, const http::request<http::string_body> &req)
     {
         std::string regex_pattern = convert_route_to_regex(route_pattern);
         spdlog::info("Converted route pattern: {}", regex_pattern);
@@ -106,39 +102,55 @@ namespace Softadastra
             spdlog::info("Extracted parameters: {}", map_to_string(params));
 
             // Valider les paramètres id et slug
-            for (const auto &[key, value] : params)
+            if (!validate_parameters(params, res))
             {
-                if (key == "id")
-                {
-                    if (!std::regex_match(value, std::regex("^[0-9]+$")))
-                    {
-                        spdlog::warn("Invalid 'id' parameter: {}", value);
-                        res.result(http::status::bad_request);
-                        res.set(http::field::content_type, "application/json");
-                        res.body() = json{{"message", "Invalid 'id' parameter. Must be a positive integer."}}.dump();
-                        return false;
-                    }
-                }
-                if (key == "slug")
-                {
-                    if (!std::regex_match(value, std::regex("^[a-zA-Z0-9_-]+$")))
-                    {
-                        spdlog::warn("Invalid 'slug' parameter: {}", value);
-                        res.result(http::status::bad_request);
-                        res.set(http::field::content_type, "application/json");
-                        res.body() = json{{"message", "Invalid 'slug' parameter. Must be alphanumeric."}}.dump();
-                        return false;
-                    }
-                }
+                return false;
             }
 
-            dynamic_cast<DynamicRequestHandler *>(handler.get())->set_params(params);
-            handler->handle_request({}, res); // Passer une requête vide si besoin
-            return true;
+            // Passer les paramètres au handler dynamique
+            auto dynamic_handler = std::dynamic_pointer_cast<DynamicRequestHandler>(handler);
+            if (dynamic_handler)
+            {
+                dynamic_handler->set_params(params);
+                dynamic_handler->handle_request(req, res); // Passe la requête réelle ici
+                return true;
+            }
+            else
+            {
+                spdlog::warn("Handler is not of type DynamicRequestHandler.");
+                res.result(http::status::internal_server_error); // 500 Internal Server Error
+                res.set(http::field::content_type, "application/json");
+                res.body() = json{{"message", "Internal Server Error: Handler type mismatch"}}.dump();
+                return false;
+            }
         }
 
         spdlog::info("Path '{}' does not match route pattern '{}'", path, route_pattern);
         return false;
+    }
+
+    bool Router::validate_parameters(const std::unordered_map<std::string, std::string> &params, http::response<http::string_body> &res)
+    {
+        for (const auto &[key, value] : params)
+        {
+            if (key == "id" && !std::regex_match(value, std::regex("^[0-9]+$")))
+            {
+                spdlog::warn("Invalid 'id' parameter: {}", value);
+                res.result(http::status::bad_request);
+                res.set(http::field::content_type, "application/json");
+                res.body() = json{{"message", "Invalid 'id' parameter. Must be a positive integer."}}.dump();
+                return false;
+            }
+            if (key == "slug" && !std::regex_match(value, std::regex("^[a-zA-Z0-9_-]+$")))
+            {
+                spdlog::warn("Invalid 'slug' parameter: {}", value);
+                res.result(http::status::bad_request);
+                res.set(http::field::content_type, "application/json");
+                res.body() = json{{"message", "Invalid 'slug' parameter. Must be alphanumeric."}}.dump();
+                return false;
+            }
+        }
+        return true;
     }
 
     std::string Router::convert_route_to_regex(const std::string &route)
@@ -183,5 +195,4 @@ namespace Softadastra
         regex += "$"; // Fin de l'URL
         return regex;
     }
-
 }
