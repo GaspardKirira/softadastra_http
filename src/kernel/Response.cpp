@@ -1,14 +1,14 @@
-#include "ResponseSender.hpp"
+#include "Response.hpp"
 
 namespace Softadastra
 {
-    void ResponseSender::send(tcp::socket &socket, http::response<http::string_body> &res)
+    void Response::send(tcp::socket &socket, http::response<http::string_body> &res)
     {
         // Envoi de la réponse HTTP au client via le socket
         http::write(socket, res);
     }
 
-    void ResponseSender::send_error(tcp::socket &socket, const std::string &error_message)
+    void Response::send_error(tcp::socket &socket, const std::string &error_message)
     {
         // Création de la réponse d'erreur avec un code HTTP 400 (Bad Request)
         http::response<http::string_body> res;

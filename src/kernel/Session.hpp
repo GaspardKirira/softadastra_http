@@ -2,7 +2,7 @@
 #define SESSION_HPP
 
 #include <boost/asio/ip/tcp.hpp>
-#include "ResponseSender.hpp"
+#include "Response.hpp"
 #include "Router.hpp"
 #include <algorithm>
 
