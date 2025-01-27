@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <spdlog/spdlog.h>
 #include "IRequestHandler.hpp"
 #include "Config.hpp"
@@ -101,9 +102,7 @@ namespace Softadastra
          * @param res La réponse HTTP à générer en cas de correspondance.
          * @return true si une correspondance dynamique est trouvée, sinon false.
          */
-        bool matches_dynamic_route(const std::string &route_pattern, const std::string &path,
-                                   std::shared_ptr<IRequestHandler> handler, // Ajout du handler
-                                   http::response<http::string_body> &res);
+        bool matches_dynamic_route(const std::string &route_pattern, const std::string &path, std::shared_ptr<IRequestHandler> handler, http::response<http::string_body> &res, const http::request<http::string_body> &req);
 
         /**
          * @brief Convertit une route en une expression régulière pour la comparer à l'URL de la requête.
@@ -113,6 +112,8 @@ namespace Softadastra
          * @return L'expression régulière qui correspond à la route.
          */
         std::string convert_route_to_regex(const std::string &route);
+
+        bool validate_parameters(const std::unordered_map<std::string, std::string> &params, http::response<http::string_body> &res);
 
         /**
          * @brief La table des routes, indexée par une paire (méthode HTTP, URL).

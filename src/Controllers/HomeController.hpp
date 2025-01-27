@@ -59,10 +59,31 @@ namespace Softadastra
                                      [](const http::request<http::string_body> &req,
                                         http::response<http::string_body> &res)
                                      {
+                                         // Vérification si la méthode n'est pas POST
+                                         if (req.method() != http::verb::post)
+                                         {
+                                             // Retourner une réponse '405 Method Not Allowed' si la méthode n'est pas POST
+                                             res.result(http::status::method_not_allowed);
+                                             res.set(http::field::content_type, "application/json");
+                                             res.body() = json{{"message", "Method not allowed, use POST."}}.dump();
+                                             return;
+                                         }
+
+                                         // Vérification si la requête n'a pas de corps (pas de paramètres)
+                                         if (req.body().empty())
+                                         {
+                                             res.result(http::status::bad_request);
+                                             res.set(http::field::content_type, "application/json");
+                                             res.body() = json{{"message", "Missing request body."}}.dump();
+                                             return;
+                                         }
+
                                          try
                                          {
+                                             // Tentative de parsing du corps de la requête en JSON
                                              auto json_data = json::parse(req.body());
 
+                                             // Vérification si le champ 'name' est présent
                                              if (json_data.find("name") == json_data.end())
                                              {
                                                  res.result(http::status::bad_request);
