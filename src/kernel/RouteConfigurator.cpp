@@ -1,6 +1,6 @@
-#include "ProductRoutes.hpp"
-#include "UserRoutes.hpp"
-#include "HomeRoutes.hpp"
+#include "../ProductController.hpp"
+#include "../UserController.hpp"
+#include "../HomeController.hpp"
 #include <memory>
 
 #include "RouteConfigurator.hpp"
@@ -14,13 +14,13 @@ namespace Softadastra
 
     void RouteConfigurator::configure_routes()
     {
-        HomeRoutes homeRoutes;
-        homeRoutes.configure(router_);
+        HomeController homeController;
+        homeController.configure(router_);
 
-        ProductRoutes productRoutes;
-        productRoutes.configure(router_);
+        ProductController productController;
+        productController.configure(router_);
 
-        UserRoutes userRoutes;
-        userRoutes.configure(router_);
+        UserController userController;
+        userController.configure(router_);
     }
 }

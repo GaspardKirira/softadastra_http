@@ -1,6 +1,6 @@
 #include "DynamicRequestHandler.hpp"
-#include <spdlog/spdlog.h> // Ajout de spdlog pour les logs
-#include <regex>           // Ajout pour la validation avec std::regex
+#include <spdlog/spdlog.h> 
+#include <regex>          
 
 namespace Softadastra
 {
@@ -9,7 +9,7 @@ namespace Softadastra
         std::function<void(const std::unordered_map<std::string, std::string> &,
                            http::response<http::string_body> &)>
             handler)
-        : params_(), handler_(std::move(handler)) // Inverser l'ordre des initialisations
+        : params_(), handler_(std::move(handler)) 
     {
         spdlog::info("DynamicRequestHandler initialized.");
     }
@@ -19,7 +19,6 @@ namespace Softadastra
     {
         spdlog::info("Handling request with parameters...");
 
-        // Vérification de la présence du paramètre "id"
         auto id_it = params_.find("id");
         if (id_it != params_.end())
         {

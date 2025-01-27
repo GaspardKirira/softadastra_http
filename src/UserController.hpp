@@ -1,8 +1,6 @@
 #ifndef USERROUTES_HPP
 #define USERROUTES_HPP
 
-#include "RouteConfigurator.hpp"
-#include "DynamicRequestHandler.hpp"
 #include <unordered_map>
 #include <string>
 #include <memory>
@@ -11,7 +9,7 @@
 
 namespace Softadastra
 {
-    class UserRoutes : public IRoutes
+    class UserController : public IRoutes
     {
     public:
         void configure(Softadastra::Router &router) override

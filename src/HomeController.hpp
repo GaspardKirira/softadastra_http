@@ -1,9 +1,6 @@
 #ifndef HOMEROUTES_HPP
 #define HOMEROUTES_HPP
 
-#include "RouteConfigurator.hpp"
-#include "SimpleRequestHandler.hpp"
-#include "DynamicRequestHandler.hpp"
 #include <unordered_map>
 #include <string>
 #include <memory>
@@ -15,7 +12,7 @@ using json = nlohmann::json;
 
 namespace Softadastra
 {
-    class HomeRoutes : public IRoutes
+    class HomeController : public IRoutes
     {
     public:
         void configure(Router &routes) override
