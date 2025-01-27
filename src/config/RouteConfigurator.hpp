@@ -1,10 +1,10 @@
 #ifndef ROUTECONFIGURATOR_HPP
 #define ROUTECONFIGURATOR_HPP
 
-#include "Router.hpp"
-#include "SimpleRequestHandler.hpp"
-#include "DynamicRequestHandler.hpp"
-#include "IRequestHandler.hpp"
+#include "../kernel/Router.hpp"
+#include "../kernel/SimpleRequestHandler.hpp"
+#include "../kernel/DynamicRequestHandler.hpp"
+#include "../kernel/IRequestHandler.hpp"
 #include <unordered_map>
 #include <string>
 #include <memory>

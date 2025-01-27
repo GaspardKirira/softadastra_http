@@ -5,15 +5,15 @@
 #include <string>
 #include <memory>
 #include <stdexcept>
-#include "IRoutes.hpp"
+#include "Controller.hpp"
 
 namespace Softadastra
 {
 
-    class ProductController : public IRoutes
+    class ProductController : public Controller
     {
     public:
-        void configure(Softadastra::Router &router) override
+        void configure(Router &router) override
         {
             router.add_route(http::verb::get, "/products/{id}",
                              std::static_pointer_cast<IRequestHandler>(
