@@ -19,11 +19,12 @@ namespace Softadastra
     {
         route_configurator_->configure_routes(); // Configure les routes via RouteConfigurator
 
-        spdlog::info("Server started on port {}", config_.getServerPort());
+        // spdlog::info("Server started on port {}", config_.getServerPort());
+        spdlog::info("Softadastra/master server is running at http://127.0.0.1:{} using {} threads", config_.getServerPort(), NUMBER_OF_THREADS);
         spdlog::info("Waiting for incoming connections...");
 
         // Crée un ThreadPool avec un nombre de threads fixés pour traiter les connexions
-        ThreadPool pool(6); // Nombre de threads dans le pool
+        ThreadPool pool(NUMBER_OF_THREADS); // Nombre de threads dans le pool
 
         while (true)
         {

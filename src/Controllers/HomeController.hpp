@@ -6,6 +6,7 @@
 #include <memory>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
+#include <ctime>
 #include "Controller.hpp"
 
 using json = nlohmann::json;
@@ -21,12 +22,35 @@ namespace Softadastra
                 http::verb::get, "/",
                 std::static_pointer_cast<IRequestHandler>(
                     std::make_shared<SimpleRequestHandler>(
-                        [](const http::request<http::string_body> &,
+                        [](const http::request<http::string_body> &req,
                            http::response<http::string_body> &res)
                         {
+                            // Définir la version de HTTP de la réponse
+                            res.version(req.version());
+
+                            // Définir le statut de la réponse à 200 OK
                             res.result(http::status::ok);
+
+                            // Définir l'en-tête Content-Type en application/json
                             res.set(http::field::content_type, "application/json");
-                            res.body() = json{{"message", "Bienvenue sur notre backend web"}}.dump();
+
+                            // Ajouter l'en-tête Server
+                            res.set(http::field::server, "Softadastra/master");
+
+                            // Générer la date actuelle au format HTTP (RFC 1123)
+                            auto now = std::chrono::system_clock::now();
+                            std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+                            std::tm tm = *std::gmtime(&now_time_t);
+
+                            std::ostringstream oss;
+                            oss << std::put_time(&tm, "%a, %d %b %Y %H:%M:%S GMT");
+                            std::string date = oss.str();
+
+                            // Ajouter l'en-tête Date avec la date dynamique
+                            res.set(http::field::date, date);
+
+                            // Remplir le corps de la réponse avec un message JSON
+                            res.body() = json{{"message", "Welcome to the Softadastra HTTP Server"}}.dump();
                         })));
 
             routes.add_route(http::verb::post, "/create",
