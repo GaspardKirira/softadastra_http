@@ -10,7 +10,7 @@ namespace Softadastra
           io_context_(std::make_unique<net::io_context>()),
           acceptor_(std::make_unique<tcp::acceptor>(*io_context_,
                                                     tcp::endpoint(tcp::v4(), static_cast<unsigned short>(config_.getServerPort())))),
-          router_(),                                                        
+          router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)) // Passez une référence à router_
     {
     }
