@@ -25,6 +25,7 @@
 #include "Session.hpp"
 #include "Response.hpp"
 #include "../config/RouteConfigurator.hpp"
+#include "ThreadPool.hpp"
 
 namespace Softadastra
 {
@@ -76,6 +77,8 @@ namespace Softadastra
         std::unique_ptr<tcp::acceptor> acceptor_;               ///< Accepteur pour accepter les connexions entrantes.
         Router router_;                                         ///< Router pour acheminer les requêtes HTTP.
         std::unique_ptr<RouteConfigurator> route_configurator_; ///< Responsable de la configuration des routes.
+
+        Softadastra::ThreadPool thread_pool_; // Ajout du ThreadPool
     };
 };
 

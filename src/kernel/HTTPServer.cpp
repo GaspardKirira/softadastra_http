@@ -1,6 +1,6 @@
-#include "HTTPServer.hpp"
 #include "ThreadPool.hpp"
-#include <memory> // Pour std::shared_ptr
+#include "HTTPServer.hpp"
+#include <memory>
 
 namespace Softadastra
 {
@@ -9,9 +9,10 @@ namespace Softadastra
         : config_(config),
           io_context_(std::make_unique<net::io_context>()),
           acceptor_(std::make_unique<tcp::acceptor>(*io_context_,
-                                                    tcp::endpoint(tcp::v6(), static_cast<unsigned short>(config_.getServerPort())))), // Écoute sur IPv6 et IPv4
+                                                    tcp::endpoint(tcp::v6(), static_cast<unsigned short>(config_.getServerPort())))),
           router_(),
-          route_configurator_(std::make_unique<RouteConfigurator>(router_)) // Passez une référence à router_
+          route_configurator_(std::make_unique<RouteConfigurator>(router_)),
+          thread_pool_(NUMBER_OF_THREADS)
     {
     }
 
@@ -19,7 +20,7 @@ namespace Softadastra
     {
         route_configurator_->configure_routes();
 
-        spdlog::info("Softadastra/master server is running at http://[::1]:{} using {} threads", config_.getServerPort(), NUMBER_OF_THREADS);
+        spdlog::info("Softadastra/master server is running at http://127.0.0.1:{} using {} threads", config_.getServerPort(), NUMBER_OF_THREADS);
         spdlog::info("Waiting for incoming connections...");
 
         // Démarre l'acceptation asynchrone
@@ -48,7 +49,9 @@ namespace Softadastra
                                 if (!ec)
                                 {
                                     spdlog::info("Client connected!");
-                                    handle_client(socket, router_);
+                                    // Utilisez le ThreadPool pour gérer la connexion
+                                    this->thread_pool_.enqueue([this, socket]()
+                                                               { handle_client(socket, router_); });
                                 }
                                 else
                                 {
@@ -64,5 +67,4 @@ namespace Softadastra
         auto session = std::make_shared<Session>(std::move(*socket_ptr), router);
         session->run();
     }
-
 }
