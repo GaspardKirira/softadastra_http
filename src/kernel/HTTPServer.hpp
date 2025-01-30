@@ -37,7 +37,7 @@ namespace Softadastra
     using ssl_socket = boost::asio::ssl::stream<tcp::socket>;
     using json = nlohmann::json;
 
-   constexpr size_t NUMBER_OF_THREADS = 6;
+    constexpr size_t NUMBER_OF_THREADS = 6;
 
     /**
      * @brief Classe représentant un serveur HTTP.
@@ -59,6 +59,8 @@ namespace Softadastra
          * @brief Démarre le serveur HTTP et commence à accepter les connexions.
          */
         void run();
+
+        void start_accept();
 
     private:
         /**
