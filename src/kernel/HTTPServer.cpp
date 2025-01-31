@@ -15,15 +15,16 @@ namespace Softadastra
           acceptor_(nullptr),
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_, config_)),
-          request_thread_pool_(NUMBER_OF_THREADS) // Pool dédié aux requêtes
+          request_thread_pool_(NUMBER_OF_THREADS),
+          io_threads_()
     {
         try
         {
             spdlog::info("Initializing server on port {}", config_.getServerPort());
 
             int newPort = config_.getServerPort();
-            if (newPort == 8080)
-                newPort = 9090;
+            // if (newPort == 8080)
+            //     newPort = 9090;
 
             if (newPort < 1024 || newPort > 65535)
             {
