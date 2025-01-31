@@ -29,7 +29,9 @@ namespace Softadastra
 
     private:
         void read_request();
+        void close_socket();
         void handle_request(const boost::system::error_code &ec);
+
         void send_response(http::response<http::string_body> &res);
         void send_error(const std::string &error_message);
 
