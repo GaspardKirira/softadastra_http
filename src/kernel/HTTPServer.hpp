@@ -49,37 +49,23 @@ namespace Softadastra
     class HTTPServer
     {
     public:
-        /**
-         * @brief Constructeur pour initialiser le serveur HTTP avec la configuration fournie.
-         *
-         * @param config La configuration du serveur, incluant le port d'écoute.
-         */
         explicit HTTPServer(Config &config);
-
-        /**
-         * @brief Démarre le serveur HTTP et commence à accepter les connexions.
-         */
         void run();
-
         void start_accept();
 
     private:
-        /**
-         * @brief Gère la session pour un client connecté.
-         *
-         * @param socket Le socket de la connexion client.
-         * @param router Le routeur utilisé pour acheminer les requêtes HTTP.
-         */
         void handle_client(std::shared_ptr<tcp::socket> socket_ptr, Router &router);
 
-        Config &config_;                                        ///< Référence à la configuration du serveur.
-        std::unique_ptr<net::io_context> io_context_;           ///< Contexte d'entrée/sortie pour le serveur.
-        std::unique_ptr<tcp::acceptor> acceptor_;               ///< Accepteur pour accepter les connexions entrantes.
-        Router router_;                                         ///< Router pour acheminer les requêtes HTTP.
-        std::unique_ptr<RouteConfigurator> route_configurator_; ///< Responsable de la configuration des routes.
+        Config &config_;
+        std::shared_ptr<net::io_context> io_context_;
+        std::unique_ptr<tcp::acceptor> acceptor_;
+        Router router_;
+        std::unique_ptr<RouteConfigurator> route_configurator_;
 
-        Softadastra::ThreadPool thread_pool_; // Ajout du ThreadPool
+        Softadastra::ThreadPool request_thread_pool_; // Nouveau pool pour requêtes
+        std::vector<std::thread> io_threads_;         // Threads pour io_context_
     };
+
 };
 
 #endif // HTTPSERVER_HPP

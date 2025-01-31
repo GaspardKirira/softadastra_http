@@ -13,8 +13,11 @@ namespace Softadastra
     class ProductController : public Controller
     {
     public:
+        using Controller::Controller;
+
         void configure(Router &router) override
         {
+
             router.add_route(http::verb::get, "/products/{id}",
                              std::static_pointer_cast<IRequestHandler>(
                                  std::make_shared<DynamicRequestHandler>(

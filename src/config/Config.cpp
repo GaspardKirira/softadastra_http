@@ -70,7 +70,7 @@ std::unique_ptr<sql::Connection> Config::getDbConnection()
 {
     try
     {
-        sql::mysql::MySQL_Driver *driver = sql::mysql::get_mysql_driver_instance();
+        sql::mysql::MySQL_Driver *driver = sql::mysql::get_driver_instance();
         std::unique_ptr<sql::Connection> con(
             driver->connect("tcp://" + db_host + ":" + std::to_string(db_port), db_user, db_pass));
 

@@ -3,6 +3,7 @@
 
 #include <mysql_driver.h>
 #include <mysql_connection.h>
+#include <cppconn/prepared_statement.h>
 #include <iostream>
 #include <fstream>
 #include <nlohmann/json.hpp>

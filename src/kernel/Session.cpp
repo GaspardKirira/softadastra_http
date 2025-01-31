@@ -4,7 +4,10 @@ namespace Softadastra
 {
 
     Session::Session(tcp::socket socket, Router &router)
-        : socket_(std::move(socket)), router_(router), buffer_(8060), req_() {}
+        : socket_(std::move(socket)), router_(router), buffer_(8060), req_()
+    {
+        spdlog::info("Session created with socket open: {}", socket_.is_open());
+    }
 
     void Session::run()
     {
@@ -13,6 +16,12 @@ namespace Softadastra
 
     void Session::read_request()
     {
+        if (!socket_.is_open())
+        {
+            spdlog::error("Socket is not open, cannot read request!");
+            return;
+        }
+
         auto self = shared_from_this();
         spdlog::info("Reading request from client...");
 
@@ -22,14 +31,22 @@ namespace Softadastra
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
         timer->expires_after(std::chrono::seconds(5));
 
-        timer->async_wait([this, self](boost::system::error_code ec)
+        std::weak_ptr<boost::asio::steady_timer> weak_timer = timer;
+
+        timer->async_wait([this, self, weak_timer](boost::system::error_code ec)
                           {
-                          if (!ec)
-                          {
-                              spdlog::warn("Timeout: No request received after 5 seconds!");
-                              boost::system::error_code ignored_ec;
-                              socket_.close(ignored_ec); // Fermez le socket proprement
-                          } });
+                              auto timer = weak_timer.lock();
+                              if (!timer)
+                              {
+                                  spdlog::info("Timer is no longer available.");
+                                  return; // Le timer n'existe plus
+                              }
+
+                              if (!ec)
+                              {
+                                  spdlog::warn("Timeout: No request received after 5 seconds!");
+                                  close_socket();
+                              } });
 
         spdlog::info("Calling async_read()...");
 
@@ -41,8 +58,7 @@ namespace Softadastra
                              if (ec)
                              {
                                  spdlog::error("Error during async_read: {}", ec.message());
-                                 boost::system::error_code ignored_ec;
-                                 socket_.close(ignored_ec); // Fermez le socket proprement en cas d'erreur
+                                 close_socket();
                                  return;
                              }
 
@@ -86,6 +102,12 @@ namespace Softadastra
 
     void Session::send_response(http::response<http::string_body> &res)
     {
+        if (!socket_.is_open())
+        {
+            spdlog::error("Socket is not open, cannot send response!");
+            return;
+        }
+
         auto self = shared_from_this();
         auto res_ptr = std::make_shared<boost::beast::http::response<boost::beast::http::string_body>>(std::move(res));
 
@@ -112,6 +134,16 @@ namespace Softadastra
         res.body() = json{{"message", error_message}}.dump();
 
         send_response(res);
+    }
+
+    void Session::close_socket()
+    {
+        boost::system::error_code ignored_ec;
+        if (socket_.is_open())
+        {
+            socket_.close(ignored_ec); // Fermez le socket proprement en cas d'erreur ou de timeout
+            spdlog::info("Socket closed.");
+        }
     }
 
 }

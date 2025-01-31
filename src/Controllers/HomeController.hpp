@@ -18,6 +18,8 @@ namespace Softadastra
     class HomeController : public Controller
     {
     public:
+        using Controller::Controller;
+
         void configure(Router &routes) override
         {
             routes.add_route(

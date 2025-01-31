@@ -5,6 +5,7 @@
 #include "../kernel/SimpleRequestHandler.hpp"
 #include "../kernel/DynamicRequestHandler.hpp"
 #include "../kernel/IRequestHandler.hpp"
+#include "../config/Config.hpp"
 #include <unordered_map>
 #include <string>
 #include <memory>
@@ -25,7 +26,7 @@ namespace Softadastra
          *
          * @param router Le routeur qui sera configuré avec les routes.
          */
-        explicit RouteConfigurator(Router &router);
+        explicit RouteConfigurator(Router &router, Config &config);
 
         /**
          * @brief Configure les routes pour le serveur HTTP.
@@ -37,6 +38,7 @@ namespace Softadastra
 
     private:
         Router &router_; /**< Le routeur qui sera utilisé pour ajouter les routes. */
+        Config &config_; /**< Référence à la configuration du serveur. */
     };
 }
 
