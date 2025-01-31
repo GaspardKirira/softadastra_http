@@ -58,12 +58,15 @@ namespace Softadastra
     public:
         using Controller::Controller; // Utilise le constructeur de Controller
 
-        void configure(Router &router) override
+        void configure(Router &router)
         {
+            // Créer un pointeur partagé pour capturer 'this' de manière sécurisée
+            auto self = std::shared_ptr<UserController>(this, [](UserController *) {});
+
             router.add_route(http::verb::get, "/users/{id}",
                              std::static_pointer_cast<IRequestHandler>(
                                  std::make_shared<DynamicRequestHandler>(
-                                     [this](const std::unordered_map<std::string, std::string> &params,
+                                     [self](const std::unordered_map<std::string, std::string> &params,
                                             http::response<http::string_body> &res)
                                      {
                                          try
@@ -71,14 +74,14 @@ namespace Softadastra
                                              std::string user_id = params.at("id");
                                              try
                                              {
-                                                 int id = std::stoi(user_id); // Conversion
-                                                 auto user = get_user_by_id(id);
+                                                 int id = std::stoi(user_id);          // Conversion de l'ID
+                                                 auto user = self->get_user_by_id(id); // Appel à get_user_by_id
 
                                                  if (user)
                                                  {
                                                      res.result(http::status::ok);
                                                      res.set(http::field::content_type, "application/json");
-                                                     res.body() = user->to_json().dump();
+                                                     res.body() = user->to_json().dump(); // Conversion en JSON
                                                  }
                                                  else
                                                  {
@@ -90,10 +93,16 @@ namespace Softadastra
                                              catch (const std::invalid_argument &e)
                                              {
                                                  std::cerr << "ID invalide : " << e.what() << std::endl;
+                                                 res.result(http::status::bad_request);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = nlohmann::json{{"error", "Invalid ID format"}}.dump();
                                              }
                                              catch (const std::out_of_range &e)
                                              {
                                                  std::cerr << "ID hors de portée : " << e.what() << std::endl;
+                                                 res.result(http::status::bad_request);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = nlohmann::json{{"error", "ID out of range"}}.dump();
                                              }
                                          }
                                          catch (const std::exception &e)
@@ -111,16 +120,30 @@ namespace Softadastra
             try
             {
                 // Utilisation de shared_ptr pour gérer la connexion à la base de données
-                std::unique_ptr<sql::Connection> con = config_.getDbConnection(); // Changement ici
+                std::unique_ptr<sql::mysql::MySQL_Driver> driver(sql::mysql::get_driver_instance());
+                if (!driver)
+                {
+                    std::cerr << "Failed to get MYSQL driver" << std::endl;
+                }
+
+                std::unique_ptr<sql::Connection> con(driver->connect("tcp://127.0.0.1", "root", ""));
+                if (!con)
+                {
+                    std::cerr << "Failed to connect to the database" << std::endl;
+                }
+                con->setSchema("softadastra");
+                std::unique_ptr<sql::Statement> stmt(con->createStatement());
+                if (!stmt)
+                {
+                    std::cerr << "Failed to create statement" << std::endl;
+                }
 
                 // Création d'un PreparedStatement avec shared_ptr
-                std::shared_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM users WHERE id = ?")); // Changement ici
-
+                std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM users WHERE id = ?"));
                 // Définir le paramètre de la requête
                 pstmt->setInt(1, userId);
-
                 // Exécuter la requête et obtenir le résultat
-                std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery()); // Changement ici
+                std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery());
 
                 // Si un utilisateur est trouvé
                 if (res->next())

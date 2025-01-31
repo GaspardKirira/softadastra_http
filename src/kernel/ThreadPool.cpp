@@ -114,3 +114,114 @@ namespace Softadastra
 
     ThreadPool::~ThreadPool() { stop(); }
 } // namespace Softadastra
+
+// std::optional<User> get_user_by_id(int userId)
+//         {
+//             try
+//             {
+//                 // Utilisation de shared_ptr pour gérer la connexion à la base de données
+//                 std::unique_ptr<sql::mysql::MySQL_Driver> driver(sql::mysql::get_driver_instance());
+//                 if (!driver)
+//                 {
+//                     std::cerr << "Failed to get MYSQL driver" << std::endl;
+//                 }
+
+//                 std::unique_ptr<sql::Connection> con(driver->connect("tcp://127.0.0.1", "root", ""));
+//                 if (!con)
+//                 {
+//                     std::cerr << "Failed to connect to the database" << std::endl;
+//                 }
+//                 con->setSchema("softadastra");
+//                 std::unique_ptr<sql::Statement> stmt(con->createStatement());
+//                 if (!stmt)
+//                 {
+//                     std::cerr << "Failed to create statement" << std::endl;
+//                 }
+
+//                 // Création d'un PreparedStatement avec shared_ptr
+//                 std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM users WHERE id = ?"));
+//                 // Définir le paramètre de la requête
+//                 pstmt->setInt(1, userId);
+//                 // Exécuter la requête et obtenir le résultat
+//                 std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
+//                 // Si un utilisateur est trouvé
+//                 if (res->next())
+//                 {
+//                     User user;
+//                     user.setId(res->getInt("id"));
+//                     user.setFullName(res->getString("full_name"));
+//                     user.setEmail(res->getString("email"));
+
+//                     return user; // Retourner l'utilisateur trouvé
+//                 }
+
+//                 // Aucun utilisateur trouvé, retourner std::nullopt
+//                 return std::nullopt;
+//             }
+//             catch (const sql::SQLException &e)
+//             {
+//                 // Gestion des erreurs SQL
+//                 std::cerr << "Erreur SQL : " << e.what() << std::endl;
+//                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
+//             }
+//             catch (const std::exception &e)
+//             {
+//                 // Gestion des autres exceptions
+//                 std::cerr << "Erreur générique : " << e.what() << std::endl;
+//                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
+//             }
+//         }
+
+// std::optional<User> get_user_by_id(int userId)
+//         {
+//             try
+//             {
+//                 // Utilisation de Config pour obtenir la connexion à la base de données
+//                 Config &config = Config::getInstance();
+//                 config.loadConfig();
+
+//                 std::unique_ptr<sql::Connection> con = config.getDbConnection();
+
+//                 // Assurez-vous que la connexion est toujours valide
+//                 if (!con)
+//                 {
+//                     throw std::runtime_error("La connexion à la base de données a échoué.");
+//                 }
+
+//                 // Utilisation d'un unique_ptr pour gérer automatiquement le PreparedStatement
+//                 std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM users WHERE id = ?"));
+
+//                 // Définir le paramètre de la requête
+//                 pstmt->setInt(1, userId);
+
+//                 // Exécuter la requête et obtenir le résultat
+//                 std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
+//                 // Si un utilisateur est trouvé
+//                 if (res->next())
+//                 {
+//                     User user;
+//                     user.setId(res->getInt("id"));
+//                     user.setFullName(res->getString("full_name"));
+//                     user.setEmail(res->getString("email"));
+
+//                     return user; // Retourner l'utilisateur trouvé
+//                 }
+
+//                 // Aucun utilisateur trouvé, retourner std::nullopt
+//                 return std::nullopt;
+//             }
+//             catch (const sql::SQLException &e)
+//             {
+//                 // Gestion des erreurs SQL
+//                 std::cerr << "Erreur SQL : " << e.what() << std::endl;
+//                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
+//             }
+//             catch (const std::exception &e)
+//             {
+//                 // Gestion des autres exceptions
+//                 std::cerr << "Erreur générique : " << e.what() << std::endl;
+//                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
+//             }
+//         }
