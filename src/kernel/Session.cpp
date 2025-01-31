@@ -25,7 +25,7 @@ namespace Softadastra
         auto self = shared_from_this();
         spdlog::info("Reading request from client...");
 
-        buffer_.consume(buffer_.size()); // Vider le buffer existant
+        buffer_.consume(buffer_.size());
         spdlog::info("Buffer cleared, size: {}", buffer_.size());
 
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
@@ -39,7 +39,7 @@ namespace Softadastra
                               if (!timer)
                               {
                                   spdlog::info("Timer is no longer available.");
-                                  return; // Le timer n'existe plus
+                                  return;
                               }
 
                               if (!ec)
@@ -53,7 +53,7 @@ namespace Softadastra
         http::async_read(socket_, buffer_, req_,
                          [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
                          {
-                             timer->cancel(); // Annulez le timer si la lecture aboutit
+                             timer->cancel(); 
 
                              if (ec)
                              {
@@ -67,7 +67,7 @@ namespace Softadastra
                              spdlog::info("Target: {}", req_.target());
                              spdlog::info("Body: {}", req_.body());
 
-                             handle_request(ec); // Traitez la requête après une lecture réussie
+                             handle_request(ec);
                          });
 
         spdlog::info("async_read() called!");
@@ -141,7 +141,7 @@ namespace Softadastra
         boost::system::error_code ignored_ec;
         if (socket_.is_open())
         {
-            socket_.close(ignored_ec); // Fermez le socket proprement en cas d'erreur ou de timeout
+            socket_.close(ignored_ec);
             spdlog::info("Socket closed.");
         }
     }
