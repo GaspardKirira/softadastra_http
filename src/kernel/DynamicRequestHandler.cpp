@@ -37,7 +37,6 @@ namespace Softadastra
     {
         spdlog::info("Setting parameters in DynamicRequestHandler...");
 
-        // Vérification de tous les paramètres fournis
         for (const auto &param : params)
         {
             const std::string &key = param.first;
@@ -54,7 +53,6 @@ namespace Softadastra
             }
             else if (key == "slug")
             {
-                // Valider que 'slug' ne contient pas de caractères spéciaux
                 if (!std::regex_match(value, std::regex("^[a-zA-Z0-9_-]+$")))
                 {
                     spdlog::warn("Invalid 'slug' parameter: {}", value);
@@ -63,7 +61,7 @@ namespace Softadastra
             }
         }
 
-        params_ = params; // Mise à jour des paramètres
+        params_ = params; 
         spdlog::info("Parameters set successfully.");
     }
 

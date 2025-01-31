@@ -22,7 +22,7 @@ namespace Softadastra
         auto productController = std::make_unique<ProductController>(config);
         productController->configure(router_);
 
-        auto userController = std::make_shared<UserController>(config); // Utilisation d'un shared_ptr
+        auto userController = std::make_shared<UserController>(config);
         userController->configure(router_);
     }
 

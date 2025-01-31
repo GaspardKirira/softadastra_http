@@ -23,8 +23,6 @@ namespace Softadastra
             spdlog::info("Initializing server on port {}", config_.getServerPort());
 
             int newPort = config_.getServerPort();
-            // if (newPort == 8080)
-            //     newPort = 9090;
 
             if (newPort < 1024 || newPort > 65535)
             {
@@ -82,7 +80,6 @@ namespace Softadastra
 
         start_accept();
 
-        // On ajoute des threads pour io_context_
         for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
         {
             io_threads_.emplace_back([this, i]()
@@ -98,7 +95,6 @@ namespace Softadastra
             } });
         }
 
-        // Attendre que les threads terminent proprement
         for (auto &t : io_threads_)
         {
             if (t.joinable())
