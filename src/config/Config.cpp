@@ -68,7 +68,7 @@ std::unique_ptr<sql::Connection> Config::getDbConnection()
 {
     try
     {
-        std::unique_ptr<sql::mysql::MySQL_Driver> driver(sql::mysql::get_mysql_driver_instance());
+        sql::mysql::MySQL_Driver *driver = sql::mysql::get_mysql_driver_instance();
         if (!driver)
         {
             throw std::runtime_error("Impossible de récupérer le driver MySQL.");

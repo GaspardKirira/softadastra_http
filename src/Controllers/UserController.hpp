@@ -68,40 +68,58 @@ namespace Softadastra
                                      {
                                          try
                                          {
-                                             // std::string user_id = params.at("id");
                                              std::stringstream ss(params.at("id"));
-                                             try
-                                             {
-                                                 int id{};
-                                                 ss >> id;
-                                                 auto user = self->get_user_by_id(id);
+                                             int id{};
+                                             ss >> id;
+                                             auto user = self->get_user_by_id(id);
 
-                                                 if (user)
-                                                 {
-                                                     res.result(http::status::ok);
-                                                     res.set(http::field::content_type, "application/json");
-                                                     res.body() = user->to_json().dump();
-                                                 }
-                                                 else
-                                                 {
-                                                     res.result(http::status::not_found);
-                                                     res.set(http::field::content_type, "application/json");
-                                                     res.body() = nlohmann::json{{"error", "User not found"}}.dump();
-                                                 }
-                                             }
-                                             catch (const std::invalid_argument &e)
+                                             if (user)
                                              {
-                                                 std::cerr << "ID invalide : " << e.what() << std::endl;
-                                                 res.result(http::status::bad_request);
+                                                 res.result(http::status::ok);
                                                  res.set(http::field::content_type, "application/json");
-                                                 res.body() = nlohmann::json{{"error", "Invalid ID format"}}.dump();
+                                                 res.body() = user->to_json().dump();
                                              }
-                                             catch (const std::out_of_range &e)
+                                             else
                                              {
-                                                 std::cerr << "ID hors de portée : " << e.what() << std::endl;
-                                                 res.result(http::status::bad_request);
+                                                 res.result(http::status::not_found);
                                                  res.set(http::field::content_type, "application/json");
-                                                 res.body() = nlohmann::json{{"error", "ID out of range"}}.dump();
+                                                 res.body() = nlohmann::json{{"error", "User not found"}}.dump();
+                                             }
+                                         }
+                                         catch (const std::exception &e)
+                                         {
+                                             res.result(http::status::internal_server_error);
+                                             res.set(http::field::content_type, "application/json");
+                                             res.body() = nlohmann::json{{"error", e.what()}}.dump();
+                                         }
+                                     })));
+
+            router.add_route(http::verb::get, "/users",
+                             std::static_pointer_cast<IRequestHandler>(
+                                 std::make_shared<DynamicRequestHandler>(
+                                     [self](const std::unordered_map<std::string, std::string> &,
+                                            http::response<http::string_body> &res)
+                                     {
+                                         try
+                                         {
+                                             std::vector<User> users = self->findAll();
+
+                                             if (!users.empty())
+                                             {
+                                                 res.result(http::status::ok);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 nlohmann::json users_json = nlohmann::json::array();
+                                                 for (const auto &user : users)
+                                                 {
+                                                     users_json.push_back(user.to_json());
+                                                 }
+                                                 res.body() = users_json.dump();
+                                             }
+                                             else
+                                             {
+                                                 res.result(http::status::no_content); 
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = nlohmann::json{{"message", "No users found"}}.dump();
                                              }
                                          }
                                          catch (const std::exception &e)
@@ -150,6 +168,47 @@ namespace Softadastra
                 std::cerr << "Erreur générique : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
             }
+        }
+
+        std::vector<User> findAll()
+        {
+            std::vector<User> users;
+
+            try
+            {
+                Config &config = Config::getInstance();
+                config.loadConfig();
+
+                std::unique_ptr<sql::Connection> con = config.getDbConnection();
+                if (!con)
+                {
+                    throw std::runtime_error("La connexion à la base de données a échoué.");
+                }
+
+                std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM tbl_user"));
+                std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
+                while (res->next())
+                {
+                    User user;
+                    user.setId(res->getInt("id"));
+                    user.setFullName(res->getString("full_name"));
+                    user.setEmail(res->getString("email"));
+                    users.push_back(user);
+                }
+            }
+            catch (const sql::SQLException &e)
+            {
+                std::cerr << "Erreur SQL : " << e.what() << std::endl;
+                throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Erreur générique : " << e.what() << std::endl;
+                throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
+            }
+
+            return users;
         }
     };
 }
