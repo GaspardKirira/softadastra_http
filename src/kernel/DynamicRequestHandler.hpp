@@ -42,7 +42,9 @@ namespace Softadastra
          *
          * @param params Les paramètres extraits de l'URL.
          */
-        void set_params(const std::unordered_map<std::string, std::string> &params);
+        void set_params(
+            const std::unordered_map<std::string, std::string> &params,
+            http::response<http::string_body> &res);
 
     private:
         std::unordered_map<std::string, std::string> params_; ///< Paramètres dynamiques de la route.

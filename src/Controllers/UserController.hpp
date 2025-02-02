@@ -9,6 +9,7 @@
 #include <cppconn/prepared_statement.h>
 #include "Controller.hpp"
 #include <nlohmann/json.hpp>
+#include <sstream>
 
 namespace Softadastra
 {
@@ -67,17 +68,19 @@ namespace Softadastra
                                      {
                                          try
                                          {
-                                             std::string user_id = params.at("id");
+                                             // std::string user_id = params.at("id");
+                                             std::stringstream ss(params.at("id"));
                                              try
                                              {
-                                                 int id = std::stoi(user_id);          
-                                                 auto user = self->get_user_by_id(id); 
+                                                 int id{};
+                                                 ss >> id;
+                                                 auto user = self->get_user_by_id(id);
 
                                                  if (user)
                                                  {
                                                      res.result(http::status::ok);
                                                      res.set(http::field::content_type, "application/json");
-                                                     res.body() = user->to_json().dump(); 
+                                                     res.body() = user->to_json().dump();
                                                  }
                                                  else
                                                  {
@@ -133,7 +136,7 @@ namespace Softadastra
                     user.setFullName(res->getString("full_name"));
                     user.setEmail(res->getString("email"));
 
-                    return user; 
+                    return user;
                 }
                 return std::nullopt;
             }
@@ -151,4 +154,4 @@ namespace Softadastra
     };
 }
 
-#endif 
+#endif

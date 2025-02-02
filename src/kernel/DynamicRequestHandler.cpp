@@ -1,6 +1,9 @@
 #include "DynamicRequestHandler.hpp"
-#include <spdlog/spdlog.h> 
-#include <regex>          
+#include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
+#include <regex>
+
+using json = nlohmann::json;
 
 namespace Softadastra
 {
@@ -9,7 +12,7 @@ namespace Softadastra
         std::function<void(const std::unordered_map<std::string, std::string> &,
                            http::response<http::string_body> &)>
             handler)
-        : params_(), handler_(std::move(handler)) 
+        : params_(), handler_(std::move(handler))
     {
         spdlog::info("DynamicRequestHandler initialized.");
     }
@@ -29,14 +32,16 @@ namespace Softadastra
             spdlog::warn("Parameter 'id' not found.");
         }
 
-        handler_(params_, res);
+        handler_(params_, res); // Appelle le handler avec les paramètres et la réponse
     }
 
     void DynamicRequestHandler::set_params(
-        const std::unordered_map<std::string, std::string> &params)
+        const std::unordered_map<std::string, std::string> &params,
+        http::response<http::string_body> &res)
     {
         spdlog::info("Setting parameters in DynamicRequestHandler...");
 
+        // Vérification des paramètres
         for (const auto &param : params)
         {
             const std::string &key = param.first;
@@ -48,7 +53,10 @@ namespace Softadastra
                 if (!std::regex_match(value, std::regex("^[0-9]+$")))
                 {
                     spdlog::warn("Invalid 'id' parameter: {}", value);
-                    throw std::invalid_argument("Invalid parameter value for 'id'. Must be a positive integer.");
+                    res.result(http::status::bad_request); // Réponse HTTP 400
+                    res.set(http::field::content_type, "application/json");
+                    res.body() = json{{"message", "Invalid 'id' parameter. Must be a positive integer."}}.dump();
+                    return; // Arrête l'exécution après la réponse
                 }
             }
             else if (key == "slug")
@@ -56,12 +64,16 @@ namespace Softadastra
                 if (!std::regex_match(value, std::regex("^[a-zA-Z0-9_-]+$")))
                 {
                     spdlog::warn("Invalid 'slug' parameter: {}", value);
-                    throw std::invalid_argument("Invalid parameter value for 'slug'. Must be alphanumeric.");
+                    res.result(http::status::bad_request); // Réponse HTTP 400
+                    res.set(http::field::content_type, "application/json");
+                    res.body() = json{{"message", "Invalid 'slug' parameter. Must be alphanumeric."}}.dump();
+                    return; // Arrête l'exécution après la réponse
                 }
             }
         }
 
-        params_ = params; 
+        // Si la validation passe, on assigne les paramètres
+        params_ = params;
         spdlog::info("Parameters set successfully.");
     }
 
