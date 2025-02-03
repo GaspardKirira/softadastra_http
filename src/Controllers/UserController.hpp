@@ -117,7 +117,7 @@ namespace Softadastra
                                              }
                                              else
                                              {
-                                                 res.result(http::status::no_content); 
+                                                 res.result(http::status::no_content);
                                                  res.set(http::field::content_type, "application/json");
                                                  res.body() = nlohmann::json{{"message", "No users found"}}.dump();
                                              }
@@ -132,28 +132,42 @@ namespace Softadastra
         }
 
     private:
-        std::optional<User> get_user_by_id(int userId)
+        std::unique_ptr<sql::Connection> getDbConnection()
         {
             try
             {
                 Config &config = Config::getInstance();
                 config.loadConfig();
+                return config.getDbConnection();
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Erreur lors de la connexion à la base de données : " << e.what() << std::endl;
+                throw std::runtime_error("Erreur de connexion à la base de données.");
+            }
+        }
 
-                std::unique_ptr<sql::Connection> con = config.getDbConnection();
+    private:
+        std::optional<User> get_user_by_id(int userId)
+        {
+            try
+            {
+                std::unique_ptr<sql::Connection> con = getDbConnection();
                 if (!con)
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");
                 }
+
                 std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM tbl_user WHERE id = ?"));
                 pstmt->setInt(1, userId);
                 std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
                 if (res->next())
                 {
                     User user;
                     user.setId(res->getInt("id"));
                     user.setFullName(res->getString("full_name"));
                     user.setEmail(res->getString("email"));
-
                     return user;
                 }
                 return std::nullopt;
@@ -176,10 +190,7 @@ namespace Softadastra
 
             try
             {
-                Config &config = Config::getInstance();
-                config.loadConfig();
-
-                std::unique_ptr<sql::Connection> con = config.getDbConnection();
+                std::unique_ptr<sql::Connection> con = getDbConnection();
                 if (!con)
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");
