@@ -68,11 +68,14 @@ std::unique_ptr<sql::Connection> Config::getDbConnection()
 {
     try
     {
+        // Utilisation du driver MySQL directement
         sql::mysql::MySQL_Driver *driver = sql::mysql::get_mysql_driver_instance();
         if (!driver)
         {
             throw std::runtime_error("Impossible de récupérer le driver MySQL.");
         }
+
+        // Création de la connexion
         std::unique_ptr<sql::Connection> con(
             driver->connect("tcp://" + db_host + ":" + std::to_string(db_port), db_user, db_pass));
         if (!con)
@@ -80,6 +83,7 @@ std::unique_ptr<sql::Connection> Config::getDbConnection()
             throw std::runtime_error("La connexion à la base de données a échoué.");
         }
 
+        // Sélection de la base de données
         con->setSchema(getDbName());
         return con;
     }

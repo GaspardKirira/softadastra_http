@@ -8,6 +8,7 @@ namespace Softadastra
     {
         routes_[{method, route}] = std::move(handler);
     }
+
     bool Router::handle_request(const http::request<http::string_body> &req, http::response<http::string_body> &res)
     {
         bool is_production = std::getenv("ENV") && std::string(std::getenv("ENV")) == "production";
@@ -32,21 +33,7 @@ namespace Softadastra
             return true;
         }
 
-        RouteKey key = {req.method(), std::string(req.target())};
-        auto it = routes_.find(key);
-
-        // Vérifier si la méthode et la route existent déjà
-        if (it != routes_.end())
-        {
-            if (!is_production)
-            {
-                spdlog::info("Exact match found for method '{}' and path '{}'", req.method_string(), req.target());
-            }
-            it->second->handle_request(req, res);
-            return true;
-        }
-
-        // Vérifier si la méthode HTTP est valide pour cette route
+        // Vérifier si la méthode HTTP est valide
         if (req.method() != http::verb::get && req.method() != http::verb::post && req.method() != http::verb::put &&
             req.method() != http::verb::delete_ && req.method() != http::verb::patch && req.method() != http::verb::head)
         {
@@ -57,9 +44,22 @@ namespace Softadastra
             return false;
         }
 
-        if (!is_production)
+        // Vérifier si la route existe pour la méthode HTTP donnée
+        bool route_exists = false;
+        bool method_allowed = false;
+
+        for (const auto &[route_key, handler] : routes_)
         {
-            spdlog::info("Exact match not found, trying dynamic routes...");
+            if (route_key.second == std::string(req.target()))
+            {
+                route_exists = true;
+                if (route_key.first == req.method())
+                {
+                    method_allowed = true;
+                    handler->handle_request(req, res);
+                    return true;
+                }
+            }
         }
 
         // Vérifier les routes dynamiques
@@ -73,16 +73,25 @@ namespace Softadastra
             }
         }
 
-        if (!matched)
+        if (matched)
         {
-            spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
-            res.result(http::status::not_found); // Code 404 pour route non trouvée
+            return true;
+        }
+
+        if (route_exists && !method_allowed)
+        {
+            spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
+            res.result(http::status::method_not_allowed);
             res.set(http::field::content_type, "application/json");
-            res.body() = json{{"message", "Route not found"}}.dump();
+            res.body() = json{{"message", "Method Not Allowed"}}.dump();
             return false;
         }
 
-        return true;
+        spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
+        res.result(http::status::not_found); 
+        res.set(http::field::content_type, "application/json");
+        res.body() = json{{"message", "Route not found"}}.dump();
+        return false;
     }
 
     bool Router::matches_dynamic_route(const std::string &route_pattern, const std::string &path,
