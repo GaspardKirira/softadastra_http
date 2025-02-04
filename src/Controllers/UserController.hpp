@@ -147,7 +147,6 @@ namespace Softadastra
             }
         }
 
-    private:
         std::optional<User> get_user_by_id(int userId)
         {
             try
