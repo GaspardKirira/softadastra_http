@@ -60,8 +60,6 @@ void Config::loadConfig()
     {
         throw std::runtime_error("Types incorrects dans le fichier JSON : " + std::string(e.what()));
     }
-
-    std::cout << "Configuration chargée avec succès. Serveur démarré sur le port " << server_port << std::endl;
 }
 
 std::unique_ptr<sql::Connection> Config::getDbConnection()
@@ -89,7 +87,6 @@ std::unique_ptr<sql::Connection> Config::getDbConnection()
     }
     catch (const sql::SQLException &e)
     {
-        std::cerr << "Erreur de connexion à la base de données : " << e.what() << std::endl;
         throw std::runtime_error("Erreur de connexion à la base de données.");
     }
 }

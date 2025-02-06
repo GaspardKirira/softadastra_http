@@ -6,6 +6,7 @@
 #include <memory>
 #include <stdexcept>
 #include "Controller.hpp"
+#include <spdlog/spdlog.h>
 
 namespace Softadastra
 {
@@ -59,11 +60,14 @@ namespace Softadastra
             router.add_route(http::verb::get, "/products/{id}/{slug}",
                              std::static_pointer_cast<IRequestHandler>(
                                  std::make_shared<DynamicRequestHandler>(
-                                     [](const std::unordered_map<std::string, std::string> &params,
-                                        http::response<http::string_body> &res)
+                                     [this](const std::unordered_map<std::string, std::string> &params,
+                                            http::response<http::string_body> &res)
                                      {
                                          try
                                          {
+                                             std::cout << "***********************" << std::endl;
+                                             spdlog::info("Extracted parameters: {}", map_to_string(params));
+                                             std::cout << "***********************" << std::endl;
                                              std::string product_id = params.at("id");
                                              std::string product_slug = params.at("slug");
 
@@ -76,6 +80,24 @@ namespace Softadastra
                                              throw std::invalid_argument("Missing required parameters: 'id' and/or 'slug'");
                                          }
                                      })));
+        }
+
+        std::string map_to_string(const std::unordered_map<std::string, std::string> &map)
+        {
+            std::ostringstream oss;
+            oss << "{ ";
+            for (const auto &[key, value] : map)
+            {
+                oss << key << ": " << value << ", ";
+            }
+            std::string result = oss.str();
+            if (!map.empty())
+            {
+                result.pop_back();
+                result.pop_back();
+            }
+            result += " }";
+            return result;
         }
     };
 
