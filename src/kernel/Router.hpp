@@ -72,7 +72,7 @@ namespace Softadastra
          *
          * Ce constructeur initialise une table de routage vide, prête à accepter des routes.
          */
-        Router() : routes_() {}
+        Router() : routes_(), route_patterns_() {}
 
         /**
          * @brief Ajoute une nouvelle route au routeur.
@@ -168,6 +168,8 @@ namespace Softadastra
          * @return La chaîne formatée représentant la map des paramètres.
          */
         std::string map_to_string(const std::unordered_map<std::string, std::string> &map);
+
+        std::vector<std::string> route_patterns_; // Pour stocker automatiquement les motifs
     };
 };
 

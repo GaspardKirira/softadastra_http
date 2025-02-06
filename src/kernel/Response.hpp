@@ -73,11 +73,12 @@ namespace Softadastra
         }
 
         // Méthode statique pour une réponse No Content (204)
-        static void no_content_response(http::response<http::string_body> &res)
+        // Modifier la méthode pour accepter un message personnalisé
+        static void no_content_response(http::response<http::string_body> &res, const std::string &message = "No Content")
         {
             res.result(http::status::no_content);
             res.set(http::field::content_type, "application/json");
-            res.body() = json{{"message", "No Content"}}.dump();
+            res.body() = json{{"message", message}}.dump();
             res.set(http::field::server, "Softadastra/master");
 
             // Ajouter les en-têtes CORS

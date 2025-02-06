@@ -97,7 +97,7 @@ std::string Config::getDbPasswordFromEnv()
     if (password == nullptr)
     {
         std::cerr << "Aucun mot de passe DB_PASSWORD trouvé dans les variables d'environnement, utilisation d'un mot de passe par défaut." << std::endl;
-        return "default_password";
+        return "root";
     }
     return std::string(password);
 }
