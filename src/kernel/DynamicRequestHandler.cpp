@@ -23,9 +23,10 @@ namespace Softadastra
         // Vérifier la méthode de la requête
         if (req.method() == http::verb::get)
         {
-            // Si c'est une méthode GET, on passe les paramètres extraits de l'URL
-            spdlog::info("Handling GET request with parameters...");
+            // Log de la méthode et des paramètres extraits
+            spdlog::info("Handling GET request for path: {}", req.target());
 
+            // Vérifier si les paramètres dynamiques sont présents
             auto id_it = params_.find("id");
             if (id_it != params_.end())
             {
@@ -36,15 +37,13 @@ namespace Softadastra
                 spdlog::warn("Parameter 'id' not found.");
             }
 
-            // Appeler le handler avec les paramètres extraits de l'URL
+            // Traiter la requête
             handler_(params_, res);
         }
         else
         {
-            // Pour les autres méthodes HTTP (POST, PUT, etc.), on parse le corps de la requête
+            // Traiter d'autres méthodes HTTP
             const std::string &body = req.body();
-
-            // Si le corps est vide, on renvoie une erreur
             if (body.empty())
             {
                 Response::error_response(res, http::status::bad_request, "Empty request body.");
@@ -54,33 +53,25 @@ namespace Softadastra
             json request_json;
             try
             {
-                // Tenter de parser le corps de la requête en JSON
                 request_json = json::parse(body);
             }
             catch (const std::exception &e)
             {
-                // Si le corps n'est pas valide, renvoyer une erreur
                 Response::error_response(res, http::status::bad_request, "Invalid JSON body.");
                 return;
             }
 
-            // Ajouter les paramètres du corps dans le handler
             handler_({{"body", body}}, res);
         }
     }
 
-    void DynamicRequestHandler::set_params(const std::unordered_map<std::string, std::string> &params,
-                                           http::response<http::string_body> &res)
+    void DynamicRequestHandler::set_params(
+        const std::unordered_map<std::string, std::string> &params,
+        http::response<http::string_body> &res)
     {
-        // Vérifier que les paramètres 'id' et 'slug' existent
-        if (params.find("id") == params.end() || params.find("slug") == params.end())
-        {
-            // Si un paramètre est manquant, retourner une erreur
-            Response::error_response(res, http::status::bad_request, "Missing required parameters: 'id' and/or 'slug'");
-            return;
-        }
+        spdlog::info("Setting parameters in DynamicRequestHandler...");
 
-        // Validation des paramètres
+        // Vérification des paramètres
         for (const auto &param : params)
         {
             const std::string &key = param.first;
@@ -92,16 +83,15 @@ namespace Softadastra
                 if (!std::regex_match(value, std::regex("^[0-9]+$")))
                 {
                     Response::error_response(res, http::status::bad_request, "Invalid 'id' parameter. Must be a positive integer.");
-                    return; // Arrête l'exécution après la réponse
+                    return;
                 }
             }
             else if (key == "slug")
             {
-                // Valider que 'slug' est alphanumérique avec tirets ou underscores
                 if (!std::regex_match(value, std::regex("^[a-zA-Z0-9_-]+$")))
                 {
                     Response::error_response(res, http::status::bad_request, "Invalid 'slug' parameter. Must be alphanumeric.");
-                    return; // Arrête l'exécution après la réponse
+                    return;
                 }
             }
         }

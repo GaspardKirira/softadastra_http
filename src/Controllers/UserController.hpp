@@ -61,40 +61,6 @@ namespace Softadastra
         {
             auto self = std::shared_ptr<UserController>(this, [](UserController *) {});
 
-            router.add_route(http::verb::get, "/users/{id}",
-                             std::static_pointer_cast<IRequestHandler>(
-                                 std::make_shared<DynamicRequestHandler>(
-                                     [self](const std::unordered_map<std::string, std::string> &params,
-                                            http::response<http::string_body> &res)
-                                     {
-                                         try
-                                         {
-                                             std::stringstream ss(params.at("id"));
-                                             int id{};
-                                             ss >> id;
-                                             auto user = self->get_user_by_id(id);
-
-                                             if (user)
-                                             {
-                                                 res.result(http::status::ok);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = user->to_json().dump();
-                                             }
-                                             else
-                                             {
-                                                 res.result(http::status::not_found);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = nlohmann::json{{"error", "User not found"}}.dump();
-                                             }
-                                         }
-                                         catch (const std::exception &e)
-                                         {
-                                             res.result(http::status::internal_server_error);
-                                             res.set(http::field::content_type, "application/json");
-                                             res.body() = nlohmann::json{{"error", e.what()}}.dump();
-                                         }
-                                     })));
-
             router.add_route(http::verb::get, "/users",
                              std::static_pointer_cast<IRequestHandler>(
                                  std::make_shared<DynamicRequestHandler>(
@@ -121,6 +87,40 @@ namespace Softadastra
                                                  res.result(http::status::no_content);
                                                  res.set(http::field::content_type, "application/json");
                                                  res.body() = nlohmann::json{{"message", "No users found"}}.dump();
+                                             }
+                                         }
+                                         catch (const std::exception &e)
+                                         {
+                                             res.result(http::status::internal_server_error);
+                                             res.set(http::field::content_type, "application/json");
+                                             res.body() = nlohmann::json{{"error", e.what()}}.dump();
+                                         }
+                                     })));
+
+            router.add_route(http::verb::get, "/users/{id}",
+                             std::static_pointer_cast<IRequestHandler>(
+                                 std::make_shared<DynamicRequestHandler>(
+                                     [self](const std::unordered_map<std::string, std::string> &params,
+                                            http::response<http::string_body> &res)
+                                     {
+                                         try
+                                         {
+                                             std::stringstream ss(params.at("id"));
+                                             int id{};
+                                             ss >> id;
+                                             auto user = self->get_user_by_id(id);
+
+                                             if (user)
+                                             {
+                                                 res.result(http::status::ok);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = user->to_json().dump();
+                                             }
+                                             else
+                                             {
+                                                 res.result(http::status::not_found);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = nlohmann::json{{"error", "User not found"}}.dump();
                                              }
                                          }
                                          catch (const std::exception &e)
@@ -202,22 +202,17 @@ namespace Softadastra
                     throw std::runtime_error("La connexion à la base de données a échoué.");
                 }
 
-                // Prepare the SQL query to insert the user
                 std::unique_ptr<sql::PreparedStatement> pstmt(
                     con->prepareStatement("INSERT INTO test_user (full_name, email) VALUES (?, ?)"));
                 pstmt->setString(1, full_name);
                 pstmt->setString(2, email);
-
-                // Execute the query and get the inserted user's ID
                 pstmt->executeUpdate();
 
-                // Retrieve the last inserted ID
                 std::shared_ptr<sql::Statement> stmt(con->createStatement());
                 std::shared_ptr<sql::ResultSet> rs(stmt->executeQuery("SELECT LAST_INSERT_ID()"));
                 rs->next();
                 int new_id = rs->getInt(1);
 
-                // Create the user object with the generated ID
                 User new_user;
                 new_user.setId(new_id);
                 new_user.setFullName(full_name);
