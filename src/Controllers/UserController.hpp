@@ -84,16 +84,12 @@ namespace Softadastra
                                              }
                                              else
                                              {
-                                                 res.result(http::status::no_content);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = nlohmann::json{{"message", "No users found"}}.dump();
+                                                 Softadastra::Response::no_content_response(res, "No users found");
                                              }
                                          }
                                          catch (const std::exception &e)
                                          {
-                                             res.result(http::status::internal_server_error);
-                                             res.set(http::field::content_type, "application/json");
-                                             res.body() = nlohmann::json{{"error", e.what()}}.dump();
+                                             Softadastra::Response::error_response(res, http::status::internal_server_error, e.what());
                                          }
                                      })));
 
@@ -112,22 +108,19 @@ namespace Softadastra
 
                                              if (user)
                                              {
-                                                 res.result(http::status::ok);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = user->to_json().dump();
+                                                 //  res.result(http::status::ok);
+                                                 //  res.set(http::field::content_type, "application/json");
+                                                 //  res.body() = user->to_json().dump();
+                                                 Softadastra::Response::json_response(res, user->to_json());
                                              }
                                              else
                                              {
-                                                 res.result(http::status::not_found);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = nlohmann::json{{"error", "User not found"}}.dump();
+                                                 Softadastra::Response::error_response(res, http::status::not_found, "User not found");
                                              }
                                          }
                                          catch (const std::exception &e)
                                          {
-                                             res.result(http::status::internal_server_error);
-                                             res.set(http::field::content_type, "application/json");
-                                             res.body() = nlohmann::json{{"error", e.what()}}.dump();
+                                             Softadastra::Response::error_response(res, http::status::internal_server_error, e.what());
                                          }
                                      })));
 
@@ -166,7 +159,6 @@ namespace Softadastra
                                          }
                                          catch (const nlohmann::json::exception &e)
                                          {
-                                             std::cerr << "JSON parsing error: " << e.what() << std::endl;
                                              Response::error_response(res, http::status::bad_request, "Invalid JSON format");
                                          }
                                          catch (const std::exception &e)
@@ -187,7 +179,6 @@ namespace Softadastra
             }
             catch (const std::exception &e)
             {
-                std::cerr << "Erreur lors de la connexion à la base de données : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur de connexion à la base de données.");
             }
         }
@@ -222,12 +213,10 @@ namespace Softadastra
             }
             catch (const sql::SQLException &e)
             {
-                std::cerr << "Erreur SQL : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur lors de la création de l'utilisateur : " + std::string(e.what()));
             }
             catch (const std::exception &e)
             {
-                std::cerr << "Erreur générique : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur lors de la création de l'utilisateur : " + std::string(e.what()));
             }
         }
@@ -258,12 +247,10 @@ namespace Softadastra
             }
             catch (const sql::SQLException &e)
             {
-                std::cerr << "Erreur SQL : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
             }
             catch (const std::exception &e)
             {
-                std::cerr << "Erreur générique : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
             }
         }
@@ -294,12 +281,10 @@ namespace Softadastra
             }
             catch (const sql::SQLException &e)
             {
-                std::cerr << "Erreur SQL : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
             }
             catch (const std::exception &e)
             {
-                std::cerr << "Erreur générique : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
             }
 

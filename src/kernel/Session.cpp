@@ -84,15 +84,26 @@ namespace Softadastra
         }
 
         http::response<http::string_body> res;
-        if (!router_.handle_request(req_, res))
+        bool success = router_.handle_request(req_, res);
+
+        if (!success)
         {
-            spdlog::warn("Route not found for request: {}", req_.target());
-            send_error("Route not found");
+            if (res.result() == http::status::method_not_allowed)
+            {
+                send_error("Method Not Allowed");
+            }
+            else if (res.result() == http::status::not_found)
+            {
+                send_error("Route Not Found");
+            }
+            else
+            {
+                send_error("Invalid request");
+            }
+            return;
         }
-        else
-        {
-            send_response(res);
-        }
+
+        send_response(res);
     }
 
     void Session::send_response(http::response<http::string_body> &res)

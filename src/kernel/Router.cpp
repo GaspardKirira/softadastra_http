@@ -7,7 +7,11 @@ namespace Softadastra
 {
     void Router::add_route(http::verb method, const std::string &route, std::shared_ptr<IRequestHandler> handler)
     {
+        // Ajouter la route au routeur
         routes_[{method, route}] = std::move(handler);
+
+        // Ajouter le motif de la route à la liste des motifs
+        route_patterns_.push_back(route); // Ajout automatique de la route au vecteur
     }
 
     bool Router::handle_request(const http::request<http::string_body> &req, http::response<http::string_body> &res)
@@ -19,7 +23,7 @@ namespace Softadastra
             spdlog::info("Received {} request for path '{}'", req.method_string(), req.target());
         }
 
-        // Gestion des OPTIONS
+        // Gestion des OPTIONS (pour CORS)
         if (req.method() == http::verb::options)
         {
             if (!is_production)
@@ -34,7 +38,7 @@ namespace Softadastra
             return true;
         }
 
-        // Vérifier si la méthode HTTP est valide
+        // Vérifier si la méthode HTTP est valide (si elle est dans la liste des méthodes autorisées)
         if (req.method() != http::verb::get && req.method() != http::verb::post && req.method() != http::verb::put &&
             req.method() != http::verb::delete_ && req.method() != http::verb::patch && req.method() != http::verb::head)
         {
@@ -42,13 +46,14 @@ namespace Softadastra
             res.result(http::status::method_not_allowed); // Code 405 pour méthode non autorisée
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", "Method Not Allowed"}}.dump();
-            return false;
+            return false; // Retourner immédiatement après avoir géré l'erreur
         }
 
         // Vérifier si la route existe pour la méthode HTTP donnée
         bool route_exists = false;
         bool method_allowed = false;
 
+        // Rechercher dans les routes existantes
         for (const auto &[route_key, handler] : routes_)
         {
             if (route_key.second == std::string(req.target()))
@@ -74,26 +79,30 @@ namespace Softadastra
             }
         }
 
+        // Si une route dynamique a été trouvée, la traiter
         if (matched)
         {
             return true;
         }
 
+        // Si la route existe mais que la méthode n'est pas autorisée
         if (route_exists && !method_allowed)
         {
             spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
-            res.result(http::status::method_not_allowed);
+            res.result(http::status::method_not_allowed); // Code 405 pour méthode non autorisée
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", "Method Not Allowed"}}.dump();
-            return false;
+            return false; // Retourner immédiatement après avoir géré l'erreur
         }
 
+        // Si aucune route ne correspond, retourner "Route not found"
         spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
-        res.result(http::status::not_found);
+        res.result(http::status::not_found); // Code 404 pour route non trouvée
         res.set(http::field::content_type, "application/json");
-        res.body() = json{{"message", "Route not found"}}.dump();
-        return false;
+        res.body() = json{{"message", "Route not found"}}.dump(); // Message pour "Route not found"
+        return false;                                             // Retourner immédiatement après avoir géré l'erreur
     }
+
     bool Router::matches_dynamic_route(const std::string &route_pattern, const std::string &path,
                                        std::shared_ptr<IRequestHandler> handler, http::response<http::string_body> &res,
                                        const http::request<http::string_body> &req)
@@ -132,10 +141,10 @@ namespace Softadastra
                 dynamic_handler->set_params(params, res);
                 if (res.result() != http::status::ok)
                 {
-                    return false; // Si l'erreur a été renvoyée, arrêter le traitement
+                    return false;
                 }
 
-                dynamic_handler->handle_request(req, res); // Appeler le gestionnaire
+                dynamic_handler->handle_request(req, res);
                 return true;
             }
             else
@@ -144,8 +153,6 @@ namespace Softadastra
                 return false;
             }
         }
-
-        spdlog::info("Path '{}' does not match route pattern '{}'", path, route_pattern);
         return false;
     }
 
