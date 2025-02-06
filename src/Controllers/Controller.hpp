@@ -3,6 +3,7 @@
 
 #include "../kernel/Router.hpp"
 #include "../config/Config.hpp"
+#include "../kernel/Response.hpp"
 
 namespace Softadastra
 {

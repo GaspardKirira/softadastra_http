@@ -1,3 +1,6 @@
+#ifndef RESPONSE_HPP
+#define RESPONSE_HPP
+
 #include <string>
 #include <boost/beast/http.hpp>
 #include <nlohmann/json.hpp>
@@ -151,3 +154,5 @@ namespace Softadastra
         }
     };
 }
+
+#endif // RESPONSE_HPP

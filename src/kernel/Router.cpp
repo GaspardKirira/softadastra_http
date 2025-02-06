@@ -101,6 +101,7 @@ namespace Softadastra
             std::unordered_map<std::string, std::string> params;
             size_t param_count = 0;
 
+            // Extraire les paramètres dynamiques
             for (size_t start = 0; (start = route_pattern.find('{', start)) != std::string::npos;)
             {
                 size_t end = route_pattern.find('}', start);
@@ -118,24 +119,23 @@ namespace Softadastra
 
             spdlog::info("Extracted parameters: {}", map_to_string(params));
 
+            // Assurez-vous que le gestionnaire est bien de type DynamicRequestHandler
             auto dynamic_handler = std::dynamic_pointer_cast<DynamicRequestHandler>(handler);
             if (dynamic_handler)
             {
-                dynamic_handler->set_params(params, res); // Validation et gestion des erreurs
-                if (res.result() != http::status::ok)     // Si une erreur a été définie (par ex. Bad Request)
+                // Passer les paramètres extraits au gestionnaire
+                dynamic_handler->set_params(params, res);
+                if (res.result() != http::status::ok)
                 {
-                    return false; // Ne pas continuer si une erreur a eu lieu
+                    return false; // Si l'erreur a été renvoyée, arrêter le traitement
                 }
 
-                dynamic_handler->handle_request(req, res);
+                dynamic_handler->handle_request(req, res); // Appeler le gestionnaire
                 return true;
             }
             else
             {
-                spdlog::warn("Handler is not of type DynamicRequestHandler.");
-                res.result(http::status::internal_server_error);
-                res.set(http::field::content_type, "application/json");
-                res.body() = json{{"message", "Internal Server Error: Handler type mismatch"}}.dump();
+                Response::error_response(res, http::status::internal_server_error, "Internal Server Error: Handler type mismatch");
                 return false;
             }
         }
@@ -177,19 +177,13 @@ namespace Softadastra
 
             if (key == "id" && !std::regex_match(sanitized_value, std::regex("^[0-9]+$")))
             {
-                spdlog::warn("Invalid 'id' parameter: {}", sanitized_value);
-                res.result(http::status::bad_request);
-                res.set(http::field::content_type, "application/json");
-                res.body() = json{{"message", "Invalid 'id' parameter. Must be a positive integer."}}.dump();
+                Response::error_response(res, http::status::bad_request, "Invalid 'id' parameter. Must be a positive integer.");
                 return false;
             }
 
             if (key == "slug" && !std::regex_match(sanitized_value, std::regex("^[a-zA-Z0-9_-]+$")))
             {
-                spdlog::warn("Invalid 'slug' parameter: {}", sanitized_value);
-                res.result(http::status::bad_request);
-                res.set(http::field::content_type, "application/json");
-                res.body() = json{{"message", "Invalid 'slug' parameter. Must be alphanumeric, with dashes or underscores."}}.dump();
+                Response::error_response(res, http::status::bad_request, "Invalid 'slug' parameter. Must be alphanumeric, with dashes or underscores.");
                 return false;
             }
         }

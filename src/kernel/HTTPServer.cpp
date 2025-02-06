@@ -20,8 +20,6 @@ namespace Softadastra
     {
         try
         {
-            spdlog::info("Initializing server on port {}", config_.getServerPort());
-
             int newPort = config_.getServerPort();
 
             if (newPort < 1024 || newPort > 65535)
@@ -61,8 +59,6 @@ namespace Softadastra
                 spdlog::error("Failed to listen on the server port: {} (Error code: {})", ec.message(), ec.value());
                 throw std::system_error(ec, "Could not listen on the server port");
             }
-
-            spdlog::info("Server started successfully on port {}", newPort);
         }
         catch (const std::exception &e)
         {
@@ -75,7 +71,7 @@ namespace Softadastra
     {
         route_configurator_->configure_routes();
 
-        spdlog::info("Softadastra/master server is running at http://127.0.0.1:{} using {} threads", config_.getServerPort(), NUMBER_OF_THREADS);
+        spdlog::info("Softadastra/master server is running at http://127.0.0.1:{}", config_.getServerPort(), NUMBER_OF_THREADS);
         spdlog::info("Waiting for incoming connections...");
 
         start_accept();
@@ -86,7 +82,7 @@ namespace Softadastra
                                      {
             try
             {
-                spdlog::info("I/O Thread {} started.", i);
+                //spdlog::info("I/O Thread {} started.", i);
                 io_context_->run();
             }
             catch (const std::exception &e)
@@ -108,7 +104,6 @@ namespace Softadastra
 
         try
         {
-            spdlog::info("Starting async_accept...");
             acceptor_->async_accept(*socket, [this, socket](boost::system::error_code ec)
                                     {
             if (!ec)
@@ -118,7 +113,6 @@ namespace Softadastra
                 {
                     try
                     {
-                        spdlog::info("Handling new client session...");
                         handle_client(socket, router_);
                     }
                     catch (const std::exception &e)
@@ -144,7 +138,6 @@ namespace Softadastra
     {
         try
         {
-            spdlog::info("Starting client session...");
             auto session = std::make_shared<Session>(std::move(*socket_ptr), router);
             session->run();
         }

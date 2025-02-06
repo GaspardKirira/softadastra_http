@@ -1,4 +1,5 @@
 #include "Session.hpp"
+#include "Response.hpp"
 
 namespace Softadastra
 {
@@ -6,7 +7,6 @@ namespace Softadastra
     Session::Session(tcp::socket socket, Router &router)
         : socket_(std::move(socket)), router_(router), buffer_(8060), req_()
     {
-        spdlog::info("Session created with socket open: {}", socket_.is_open());
     }
 
     void Session::run()
@@ -23,7 +23,6 @@ namespace Softadastra
         }
 
         auto self = shared_from_this();
-        spdlog::info("Reading request from client...");
 
         buffer_.consume(buffer_.size());
         spdlog::info("Buffer cleared, size: {}", buffer_.size());
@@ -48,12 +47,10 @@ namespace Softadastra
                                   close_socket();
                               } });
 
-        spdlog::info("Calling async_read()...");
-
         http::async_read(socket_, buffer_, req_,
                          [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
                          {
-                             timer->cancel(); 
+                             timer->cancel();
 
                              if (ec)
                              {
@@ -69,8 +66,6 @@ namespace Softadastra
 
                              handle_request(ec);
                          });
-
-        spdlog::info("async_read() called!");
     }
 
     void Session::handle_request(const boost::system::error_code &ec)
@@ -119,8 +114,6 @@ namespace Softadastra
                                                 spdlog::error("Error sending response: {}", ec.message());
                                                 return;
                                             }
-
-                                            spdlog::info("Response sent successfully.");
                                             socket_.shutdown(tcp::socket::shutdown_both);
                                             socket_.close();
                                         });
@@ -129,9 +122,7 @@ namespace Softadastra
     void Session::send_error(const std::string &error_message)
     {
         http::response<http::string_body> res;
-        res.result(http::status::bad_request);
-        res.set(http::field::content_type, "application/json");
-        res.body() = json{{"message", error_message}}.dump();
+        Response::error_response(res, http::status::bad_request, error_message);
 
         send_response(res);
     }

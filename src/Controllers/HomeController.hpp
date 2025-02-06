@@ -26,25 +26,14 @@ namespace Softadastra
                 http::verb::get, "/",
                 std::static_pointer_cast<IRequestHandler>(
                     std::make_shared<SimpleRequestHandler>(
-                        [](const http::request<http::string_body> &req,
+                        [](const http::request<http::string_body> &,
                            http::response<http::string_body> &res)
                         {
-                            res.version(req.version());
-                            res.result(http::status::ok);
-                            res.set(http::field::content_type, "application/json");
-                            res.set(http::field::server, "Softadastra/master");
-                            auto now = std::chrono::system_clock::now();
-                            std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
-                            std::tm tm = *std::gmtime(&now_time_t);
-                            std::ostringstream oss;
-                            oss << std::put_time(&tm, "%a, %d %b %Y %H:%M:%S GMT");
-                            std::string date = oss.str();
-                            res.set(http::field::date, date);
-                            res.body() = json{{"message", "Welcome to the Softadastra HTTP Server"}}.dump();
+                            Response::success_response(res, "Welcome to the Softadastra HTTP Server");
                         })));
 
             routes.add_route(
-                http::verb::get, "/",
+                http::verb::get, "/peers",
                 std::static_pointer_cast<IRequestHandler>(
                     std::make_shared<SimpleRequestHandler>(
                         [](const http::request<http::string_body> &,
@@ -67,7 +56,7 @@ namespace Softadastra
                                              if (request_json.contains("peer"))
                                              {
                                                  std::string peer_address = request_json["peer"];
-                                                 peers.insert(peer_address); 
+                                                 peers.insert(peer_address);
 
                                                  res.result(http::status::ok);
                                                  res.set(http::field::content_type, "application/json");
