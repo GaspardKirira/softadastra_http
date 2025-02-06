@@ -1,5 +1,6 @@
 #include "DynamicRequestHandler.hpp"
 #include "Router.hpp"
+#include "Response.hpp"
 #include <regex>
 
 namespace Softadastra
@@ -38,9 +39,7 @@ namespace Softadastra
             req.method() != http::verb::delete_ && req.method() != http::verb::patch && req.method() != http::verb::head)
         {
             spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
-            res.result(http::status::method_not_allowed); // Code 405 pour méthode non autorisée
-            res.set(http::field::content_type, "application/json");
-            res.body() = json{{"message", "Method Not Allowed"}}.dump();
+            Response::error_response(res, http::status::method_not_allowed, "Method Not Allowed");
             return false;
         }
 
@@ -81,16 +80,12 @@ namespace Softadastra
         if (route_exists && !method_allowed)
         {
             spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
-            res.result(http::status::method_not_allowed);
-            res.set(http::field::content_type, "application/json");
-            res.body() = json{{"message", "Method Not Allowed"}}.dump();
+            Response::error_response(res, http::status::method_not_allowed, "Method Not Allowed");
             return false;
         }
 
         spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
-        res.result(http::status::not_found); 
-        res.set(http::field::content_type, "application/json");
-        res.body() = json{{"message", "Route not found"}}.dump();
+        Response::error_response(res, http::status::not_found, "Route not found");
         return false;
     }
 

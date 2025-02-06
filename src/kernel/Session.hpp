@@ -2,7 +2,6 @@
 #define SESSION_HPP
 
 #include <boost/asio/ip/tcp.hpp>
-#include "Response.hpp"
 #include "Router.hpp"
 #include <boost/beast/http.hpp>
 #include <boost/asio.hpp>

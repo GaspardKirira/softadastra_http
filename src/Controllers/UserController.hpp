@@ -10,6 +10,7 @@
 #include "Controller.hpp"
 #include <nlohmann/json.hpp>
 #include <sstream>
+#include "../kernel/Response.hpp"
 
 namespace Softadastra
 {
@@ -145,46 +146,32 @@ namespace Softadastra
                                              }
                                              catch (const std::exception &e)
                                              {
-                                                 res.result(http::status::bad_request);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = json{{"message", "Invalid JSON body."}}.dump();
+                                                 Response::error_response(res, http::status::bad_request, "Inavlid JSON body");
                                                  return;
                                              }
 
                                              if (request_json.find("firstname") == request_json.end())
                                              {
-                                                 res.result(http::status::bad_request);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = json{{"message", "Le champ 'firstname' est manquant."}}.dump();
+                                                 Response::error_response(res, http::status::bad_request, "Le champ 'firstname' est manquant.");
                                                  return;
                                              }
                                              if (request_json.find("email") == request_json.end())
                                              {
-                                                 res.result(http::status::bad_request);
-                                                 res.set(http::field::content_type, "application/json");
-                                                 res.body() = json{{"message", "Le champ 'email' est manquant."}}.dump();
+                                                 Response::error_response(res, http::status::bad_request, "Le champ 'email' est manquant.");
                                                  return;
                                              }
 
                                              User new_user = self->createUser(request_json["firstname"], request_json["email"]);
-
-                                             res.result(http::status::created);
-                                             res.set(http::field::content_type, "application/json");
-                                             res.body() = json{{"message", "User created successfully"}}.dump();
+                                             Response::create_response(res, http::status::created, "User created successfully");
                                          }
                                          catch (const nlohmann::json::exception &e)
                                          {
                                              std::cerr << "JSON parsing error: " << e.what() << std::endl;
-                                             res.result(http::status::bad_request);
-                                             res.set(http::field::content_type, "application/json");
-                                             res.body() = nlohmann::json{{"error", "Invalid JSON format"}}.dump();
+                                             Response::error_response(res, http::status::bad_request, "Invalid JSON format");
                                          }
                                          catch (const std::exception &e)
                                          {
-                                             std::cerr << "Error: " << e.what() << std::endl;
-                                             res.result(http::status::internal_server_error);
-                                             res.set(http::field::content_type, "application/json");
-                                             res.body() = nlohmann::json{{"error", e.what()}}.dump();
+                                             Softadastra::Response::error_response(res, http::status::internal_server_error, e.what());
                                          }
                                      })));
         }
