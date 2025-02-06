@@ -17,22 +17,30 @@ namespace Softadastra
         spdlog::info("DynamicRequestHandler initialized.");
     }
 
-    void DynamicRequestHandler::handle_request(const http::request<http::string_body> &,
+    void DynamicRequestHandler::handle_request(const http::request<http::string_body> &req,
                                                http::response<http::string_body> &res)
     {
-        spdlog::info("Handling request with parameters...");
+        spdlog::info("Handling request with body...");
 
-        auto id_it = params_.find("id");
-        if (id_it != params_.end())
+        // Extraire le corps de la requête
+        const std::string &body = req.body();
+
+        json request_json;
+        try
         {
-            spdlog::info("Parameter 'id' found: {}", id_it->second);
+            request_json = json::parse(body);
         }
-        else
+        catch (const std::exception &e)
         {
-            spdlog::warn("Parameter 'id' not found.");
+            spdlog::error("Failed to parse JSON body: {}", e.what());
+            res.result(http::status::bad_request);
+            res.set(http::field::content_type, "application/json");
+            res.body() = json{{"message", "Invalid JSON body."}}.dump();
+            return;
         }
 
-        handler_(params_, res); // Appelle le handler avec les paramètres et la réponse
+        // Appeler le handler avec les paramètres extraits
+        handler_({{"body", body}}, res);
     }
 
     void DynamicRequestHandler::set_params(

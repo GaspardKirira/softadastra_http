@@ -129,6 +129,64 @@ namespace Softadastra
                                              res.body() = nlohmann::json{{"error", e.what()}}.dump();
                                          }
                                      })));
+
+            router.add_route(http::verb::post, "/create",
+                             std::static_pointer_cast<IRequestHandler>(
+                                 std::make_shared<DynamicRequestHandler>(
+                                     [self](const std::unordered_map<std::string, std::string> &params,
+                                            http::response<http::string_body> &res)
+                                     {
+                                         try
+                                         {
+                                             json request_json;
+                                             try
+                                             {
+                                                 request_json = json::parse(params.at("body"));
+                                             }
+                                             catch (const std::exception &e)
+                                             {
+                                                 res.result(http::status::bad_request);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = json{{"message", "Invalid JSON body."}}.dump();
+                                                 return;
+                                             }
+
+                                             if (request_json.find("firstname") == request_json.end())
+                                             {
+                                                 res.result(http::status::bad_request);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = json{{"message", "Le champ 'firstname' est manquant."}}.dump();
+                                                 return;
+                                             }
+                                             if (request_json.find("email") == request_json.end())
+                                             {
+                                                 res.result(http::status::bad_request);
+                                                 res.set(http::field::content_type, "application/json");
+                                                 res.body() = json{{"message", "Le champ 'email' est manquant."}}.dump();
+                                                 return;
+                                             }
+
+                                             User new_user = self->createUser(request_json["firstname"], request_json["email"]);
+
+                                             res.result(http::status::created);
+                                             res.set(http::field::content_type, "application/json");
+                                             res.body() = json{{"message", "User created successfully"}}.dump();
+                                         }
+                                         catch (const nlohmann::json::exception &e)
+                                         {
+                                             std::cerr << "JSON parsing error: " << e.what() << std::endl;
+                                             res.result(http::status::bad_request);
+                                             res.set(http::field::content_type, "application/json");
+                                             res.body() = nlohmann::json{{"error", "Invalid JSON format"}}.dump();
+                                         }
+                                         catch (const std::exception &e)
+                                         {
+                                             std::cerr << "Error: " << e.what() << std::endl;
+                                             res.result(http::status::internal_server_error);
+                                             res.set(http::field::content_type, "application/json");
+                                             res.body() = nlohmann::json{{"error", e.what()}}.dump();
+                                         }
+                                     })));
         }
 
     private:
@@ -144,6 +202,51 @@ namespace Softadastra
             {
                 std::cerr << "Erreur lors de la connexion à la base de données : " << e.what() << std::endl;
                 throw std::runtime_error("Erreur de connexion à la base de données.");
+            }
+        }
+
+        User createUser(const std::string &full_name, const std::string &email)
+        {
+            try
+            {
+                std::unique_ptr<sql::Connection> con = getDbConnection();
+                if (!con)
+                {
+                    throw std::runtime_error("La connexion à la base de données a échoué.");
+                }
+
+                // Prepare the SQL query to insert the user
+                std::unique_ptr<sql::PreparedStatement> pstmt(
+                    con->prepareStatement("INSERT INTO test_user (full_name, email) VALUES (?, ?)"));
+                pstmt->setString(1, full_name);
+                pstmt->setString(2, email);
+
+                // Execute the query and get the inserted user's ID
+                pstmt->executeUpdate();
+
+                // Retrieve the last inserted ID
+                std::shared_ptr<sql::Statement> stmt(con->createStatement());
+                std::shared_ptr<sql::ResultSet> rs(stmt->executeQuery("SELECT LAST_INSERT_ID()"));
+                rs->next();
+                int new_id = rs->getInt(1);
+
+                // Create the user object with the generated ID
+                User new_user;
+                new_user.setId(new_id);
+                new_user.setFullName(full_name);
+                new_user.setEmail(email);
+
+                return new_user;
+            }
+            catch (const sql::SQLException &e)
+            {
+                std::cerr << "Erreur SQL : " << e.what() << std::endl;
+                throw std::runtime_error("Erreur lors de la création de l'utilisateur : " + std::string(e.what()));
+            }
+            catch (const std::exception &e)
+            {
+                std::cerr << "Erreur générique : " << e.what() << std::endl;
+                throw std::runtime_error("Erreur lors de la création de l'utilisateur : " + std::string(e.what()));
             }
         }
 
