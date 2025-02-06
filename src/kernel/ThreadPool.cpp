@@ -47,7 +47,7 @@ namespace Softadastra
             {
                 if (workers.size() < max_dynamic_threads)
                 {
-                    workers.emplace_back([this]
+                    workers.emplace_back([this]           
                                          {
                                          while (true)
                                          {
