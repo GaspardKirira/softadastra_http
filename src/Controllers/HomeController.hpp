@@ -10,9 +10,6 @@
 #include <unordered_set>
 #include "Controller.hpp"
 
-using json = nlohmann::json;
-std::unordered_set<std::string> peers;
-
 namespace Softadastra
 {
     class HomeController : public Controller
@@ -25,8 +22,8 @@ namespace Softadastra
             routes.add_route(
                 http::verb::get, "/",
                 std::static_pointer_cast<IRequestHandler>(
-                    std::make_shared<SimpleRequestHandler>(
-                        [](const http::request<http::string_body> &,
+                    std::make_shared<DynamicRequestHandler>(
+                        [](const std::unordered_map<std::string, std::string> &,
                            http::response<http::string_body> &res)
                         {
                             Response::success_response(res, "Welcome to the Softadastra HTTP Server");

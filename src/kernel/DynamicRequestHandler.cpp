@@ -32,10 +32,6 @@ namespace Softadastra
             {
                 spdlog::info("Parameter 'id' found: {}", id_it->second);
             }
-            else
-            {
-                spdlog::warn("Parameter 'id' not found.");
-            }
 
             // Traiter la requête
             handler_(params_, res);
