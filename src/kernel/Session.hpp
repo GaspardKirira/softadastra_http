@@ -2,6 +2,7 @@
 #define SESSION_HPP
 
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ssl.hpp>
 #include "Router.hpp"
 #include <boost/beast/http.hpp>
 #include <boost/asio.hpp>
@@ -15,6 +16,7 @@ namespace Softadastra
     namespace net = boost::asio;
     namespace beast = boost::beast;
     using tcp = net::ip::tcp;
+    using ssl_socket = boost::asio::ssl::stream<tcp::socket>; ///< Définir ssl_socket pour la connexion SSL
     using json = nlohmann::json;
 
     constexpr size_t MAX_REQUEST_SIZE = 8192;
@@ -23,7 +25,7 @@ namespace Softadastra
      * @class Session
      * @brief Represents a single HTTP session (request-response cycle).
      *
-     * The Session class handles communication with a client over a TCP socket.
+     * The Session class handles communication with a client over a TCP or SSL socket.
      * It reads HTTP requests, processes them, and sends appropriate responses.
      */
     class Session : public std::enable_shared_from_this<Session>
@@ -32,10 +34,10 @@ namespace Softadastra
         /**
          * @brief Constructor for creating a new HTTP session with a given socket.
          *
-         * @param socket The TCP socket representing the client connection.
+         * @param socket The TCP or SSL socket representing the client connection.
          * @param router A reference to the Router that will handle request routing.
          */
-        explicit Session(tcp::socket socket, Softadastra::Router &router);
+        explicit Session(ssl_socket socket, Softadastra::Router &router); ///< Accepter un ssl_socket
 
         /**
          * @brief Starts the session by initiating the request reading process.
@@ -57,7 +59,7 @@ namespace Softadastra
         /**
          * @brief Closes the client socket.
          *
-         * This method shuts down and closes the TCP socket used for the session.
+         * This method shuts down and closes the TCP or SSL socket used for the session.
          * It is called when the session is finished or an error occurs.
          */
         void close_socket();
@@ -91,10 +93,10 @@ namespace Softadastra
          */
         void send_error(const std::string &error_message);
 
-        tcp::socket socket_;                   ///< The TCP socket for client communication.
-        Softadastra::Router &router_;          ///< Reference to the Router used to route requests.
-        beast::flat_buffer buffer_;            ///< Buffer for reading HTTP requests.
-        http::request<http::string_body> req_; ///< HTTP request object to store the incoming request.
+        ssl_socket socket_;                    ///< Le socket SSL pour la communication avec le client.
+        Softadastra::Router &router_;          ///< Référence au routeur utilisé pour gérer les requêtes.
+        beast::flat_buffer buffer_;            ///< Tampon pour la lecture des requêtes HTTP.
+        http::request<http::string_body> req_; ///< Objet requête HTTP pour stocker la requête reçue.
     };
 };
 
