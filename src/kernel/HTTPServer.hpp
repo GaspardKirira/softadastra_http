@@ -33,9 +33,10 @@ namespace Softadastra
     namespace beast = boost::beast;
     namespace http = boost::beast::http;
     namespace net = boost::asio;
+    namespace ssl = boost::asio::ssl;
 
     using tcp = net::ip::tcp;
-    using ssl_socket = boost::asio::ssl::stream<tcp::socket>;
+    using ssl_socket = ssl::stream<tcp::socket>; // Type de socket SSL
     using json = nlohmann::json;
 
     constexpr size_t NUMBER_OF_THREADS = 6;
@@ -85,7 +86,7 @@ namespace Softadastra
          * @param socket_ptr A shared pointer to the socket used for communication with the client.
          * @param router A reference to the Router used to handle the HTTP request.
          */
-        void handle_client(std::shared_ptr<tcp::socket> socket_ptr, Router &router);
+        void handle_client(std::shared_ptr<ssl_socket> socket_ptr, Router &router);
 
         Config &config_;                                        ///< Configuration object for the server settings.
         std::shared_ptr<net::io_context> io_context_;           ///< I/O context for asynchronous operations.
@@ -95,6 +96,8 @@ namespace Softadastra
 
         Softadastra::ThreadPool request_thread_pool_; ///< Thread pool for handling incoming requests.
         std::vector<std::thread> io_threads_;         ///< Threads for running the I/O context.
+
+        ssl::context ssl_context_; ///< SSL context for managing the SSL/TLS connections
     };
 
 };
