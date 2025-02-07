@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liste des utilisateurs</title>
+    <link rel="stylesheet" href="user.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Liste des utilisateurs</h1>
+        
+        <div id="userList">
+        </div>
+        
+        <div id="message"></div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+        fetch("http://localhost:8080/users", {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json(); 
+            }
+            return response.json().then(err => {
+                throw new Error(err.message || "Aucun utilisateur trouvé");
+            });
+        })
+        .then(data => {
+            if (data.length > 0) {
+                const userList = document.getElementById("userList");
+                data.forEach(user => {
+                    const userDiv = document.createElement("div");
+                    userDiv.classList.add("user");
+
+                    const userLink = document.createElement("a");
+                    userLink.href = `show.html?id=${user.id}`;
+                    userLink.innerText = "Voir les détails";
+
+                    userDiv.innerHTML = `
+                        <p><strong>Nom:</strong> ${user.full_name}</p>
+                        <p><strong>Email:</strong> ${user.email}</p>
+                    `;
+                    userDiv.appendChild(userLink);
+
+                    userList.appendChild(userDiv);
+                });
+            } else {
+                document.getElementById("message").innerHTML = "<p class='error'>Aucun utilisateur trouvé.</p>";
+            }
+        })
+        .catch(error => {
+            document.getElementById("message").innerHTML = `<p class='error'>Erreur: ${error.message}</p>`;
+        });
+    });
+
+    </script>
+</body>
+</html>

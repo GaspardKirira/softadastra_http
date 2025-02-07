@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détails de l'utilisateur</title>
+    <link rel="stylesheet" href="user.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Détails de l'utilisateur</h1>
+        <div id="userDetails"></div>
+        <p><a href="update.html">Update</a></p>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('id');
+
+        fetch(`http://localhost:8080/users/${userId}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json(); 
+            }
+            throw new Error("Utilisateur non trouvé");
+        })
+        .then(user => {
+            document.getElementById("userDetails").innerHTML = `
+                <p><strong>Nom:</strong> ${user.full_name}</p>
+                <p><strong>Email:</strong> ${user.email}</p>
+            `;
+        })
+        .catch(error => {
+            document.getElementById("userDetails").innerHTML = `<p class='error'>Erreur: ${error.message}</p>`;
+        });
+    </script>
+</body>
+</html>
