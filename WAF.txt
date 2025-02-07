@@ -1,0 +1,47 @@
+curl -k "https://127.0.0.1:8080/search?q=<script>alert('XSS');</script>"
+
+#!/bin/bash
+
+# Test SQL Injection
+echo "Testing SQL Injection..."
+curl -X GET "https://votresite.com/login?username=admin&password=SELECT%20*%20FROM%20users" -v
+
+# Test XSS
+echo "Testing XSS..."
+curl -X GET "https://votresite.com/search?q=<script>alert('XSS');</script>" -v
+
+# Test Path Traversal
+echo "Testing Path Traversal..."
+curl -X GET "https://votresite.com/download?file=../../../../../etc/passwd" -v
+
+# Test Command Injection
+echo "Testing Command Injection..."
+curl -X POST "https://votresite.com/upload" -d '{"file":";rm -rf /"}' -v
+
+
+curl -k "https://127.0.0.1:8080/search?q=<script>alert('XSS');</script>"
+curl -k "https://127.0.0.1:8080/login?username=admin&password=SELECT%20*%20FROM%20users"
+curl -k "https://127.0.0.1:8080/download?file=../../../../../etc/passwd"
+curl -k "https://127.0.0.1:8080/download?file=../../../../../etc/passwd"
+
+
+
+ab -n 1000 -c 10 https://127.0.0.1:8080/
+curl -v https://127.0.0.1:8080/
+curl --tlsv1.3 https://127.0.0.1:8080/
+curl -k https://127.0.0.1:8080/
+
+
+curl --cacert /path/to/cert.pem https://127.0.0.1:8080/
+
+
+============================================
+ab -n 20 -c 6 https://127.0.0.1:8080/
+
+ab -n 20 -c 6 -k https://127.0.0.1:8080/
+
+curl -k https://127.0.0.1:8080/
+listen 443 ssl;
+
+curl -v --tlsv1.2 -k -H "User-Agent: CustomAgent" https://127.0.0.1:8080/
+wrk -t2 -c2 -d10s https://127.0.0.1:8080/

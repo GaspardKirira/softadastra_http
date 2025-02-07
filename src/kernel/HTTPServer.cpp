@@ -35,22 +35,33 @@ namespace Softadastra
                                      ssl::context::no_sslv2 |
                                      ssl::context::single_dh_use);
 
-            // Vérification SSL
-            ssl_context_.set_verify_callback([](bool preverified, boost::asio::ssl::verify_context &)
+            ssl_context_.set_verify_callback([](bool preverified, boost::asio::ssl::verify_context &verify_context)
                                              {
-                if (!preverified)
-                {
-                    spdlog::error("SSL verification failed.");
-                    // Loguer le message d'erreur de vérification du certificat
-                    unsigned long errors = ERR_get_error();
-                    if (errors)
-                    {
-                        char err_buff[256];
-                        ERR_error_string_n(errors, err_buff, sizeof(err_buff));
-                        spdlog::error("SSL verification error: {}", err_buff);
-                    }
-                }
-                return preverified; });
+    if (!preverified)
+    {
+        spdlog::error("SSL verification failed.");
+        unsigned long errors = ERR_get_error();
+        if (errors)
+        {
+            char err_buff[256];
+            ERR_error_string_n(errors, err_buff, sizeof(err_buff));
+            spdlog::error("SSL verification error: {}", err_buff);
+        }
+
+        // Ajout d'informations sur le certificat échoué, par exemple l'empreinte du certificat
+        X509 *cert = X509_STORE_CTX_get_current_cert(verify_context.native_handle());
+        if (cert)
+        {
+            char *line = nullptr;
+            BIO *bio = BIO_new(BIO_s_mem());
+            X509_print(bio, cert);
+            long len = BIO_get_mem_data(bio, &line);
+            std::string cert_info(line, len);
+            BIO_free(bio);
+            spdlog::error("Failed certificate info:\n{}", cert_info);
+        }
+    }
+    return preverified; });
 
             spdlog::info("SSL/TLS context initialized successfully.");
         }
@@ -132,7 +143,7 @@ namespace Softadastra
 
     void HTTPServer::start_accept()
     {
-        auto socket = std::make_shared<ssl::stream<tcp::socket>>(*io_context_, ssl_context_); 
+        auto socket = std::make_shared<ssl::stream<tcp::socket>>(*io_context_, ssl_context_);
 
         try
         {
@@ -140,15 +151,13 @@ namespace Softadastra
                                     {
             if (!ec)
             {
-                spdlog::info("Client connected!");
-                // Logge la tentative de handshake SSL
+                spdlog::info("Client connected from: {}", socket->lowest_layer().remote_endpoint().address().to_string());
                 socket->async_handshake(ssl::stream_base::server, 
                     [this, socket](boost::system::error_code ec)
                     {
                         if (!ec)
                         {
                             spdlog::info("SSL handshake successful.");
-                            // Une fois le handshake SSL/TLS réussi, traitement la requête
                             request_thread_pool_.enqueue([this, socket]()
                             {
                                 try
@@ -158,20 +167,36 @@ namespace Softadastra
                                 catch (const std::exception &e)
                                 {
                                     spdlog::error("Error handling client: {}", e.what());
+                                    socket->lowest_layer().close(); // Close socket on failure
                                 }
                             });
                         }
                         else
                         {
-                            spdlog::error("SSL handshake failed: {}", ec.message());
-                            // Logge l'erreur SSL spécifique
-                            spdlog::error("SSL handshake failed with error code: {}", ec.value());
+                            spdlog::error("SSL handshake failed with error code {}: {}", ec.value(), ec.message());
+
+                            // Ajout d'une gestion détaillée des erreurs spécifiques
+                            if (ec == boost::asio::error::eof)
+                            {
+                                spdlog::error("SSL handshake failed due to unexpected EOF.");
+                            }
+                            else if (ec == boost::asio::error::connection_reset)
+                            {
+                                spdlog::error("SSL handshake failed due to connection reset.");
+                            }
+                            else
+                            {
+                                spdlog::error("SSL handshake failed with unknown error.");
+                            }
+
+                            // Fermer la connexion si la poignée de main échoue
+                            socket->lowest_layer().close();
                         }
                     });
             }
             else
             {
-                spdlog::error("Error accepting connection: {} (Error code: {})", ec.message(), ec.value());
+                spdlog::error("Error accepting connection from client: {} (Error code: {})", ec.message(), ec.value());
             }
 
             start_accept(); });
@@ -179,6 +204,8 @@ namespace Softadastra
         catch (const std::exception &e)
         {
             spdlog::error("Exception during async_accept: {}", e.what());
+            // Si une exception se produit, on ferme l'acceptor et le socket pour éviter les fuites de ressources
+            acceptor_->close();
         }
     }
 
@@ -186,12 +213,15 @@ namespace Softadastra
     {
         try
         {
+            spdlog::info("Starting client session for: {}", socket_ptr->lowest_layer().remote_endpoint().address().to_string());
             auto session = std::make_shared<Session>(std::move(*socket_ptr), router);
             session->run();
         }
         catch (const std::exception &e)
         {
-            spdlog::error("Error in client session: {}", e.what());
+            spdlog::error("Error in client session for client {}: {}", socket_ptr->lowest_layer().remote_endpoint().address().to_string(), e.what());
+            socket_ptr->lowest_layer().close(); // Attempt to close the socket if error occurs
+            spdlog::error("Session handler failed for client {} with exception: {}", socket_ptr->lowest_layer().remote_endpoint().address().to_string(), e.what());
         }
     }
 
