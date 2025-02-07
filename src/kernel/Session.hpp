@@ -20,6 +20,7 @@ namespace Softadastra
     using json = nlohmann::json;
 
     constexpr size_t MAX_REQUEST_SIZE = 8192;
+    constexpr size_t MAX_REQUEST_BODY_SIZE = 10 * 1024 * 1024; // 10 Mo
 
     /**
      * @class Session
@@ -82,6 +83,7 @@ namespace Softadastra
          * @param res The HTTP response to send.
          */
         void send_response(http::response<http::string_body> &res);
+        bool waf_check_request(const boost::beast::http::request<boost::beast::http::string_body> &req);
 
         /**
          * @brief Sends an error message to the client.

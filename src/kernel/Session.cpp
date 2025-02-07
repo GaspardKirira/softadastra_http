@@ -16,12 +16,27 @@ namespace Softadastra
 
     void Session::run()
     {
-        read_request();
+        auto self = shared_from_this();
+
+        // SSL Handshake
+        socket_.async_handshake(boost::asio::ssl::stream_base::server,
+                                [this, self](boost::system::error_code ec)
+                                {
+                                    if (ec)
+                                    {
+                                        spdlog::error("SSL handshake failed: {}", ec.message());
+                                        close_socket();
+                                        return;
+                                    }
+
+                                    spdlog::info("SSL handshake successful.");
+                                    read_request();
+                                });
     }
 
     void Session::read_request()
     {
-        // Vérification si le socket est ouvert (en utilisant lowest_layer)
+        // Vérification si le socket est ouvert
         if (!socket_.lowest_layer().is_open())
         {
             spdlog::error("Socket is not open, cannot read request!");
@@ -29,15 +44,13 @@ namespace Softadastra
         }
 
         auto self = shared_from_this();
-
         buffer_.consume(buffer_.size());
-        spdlog::info("Buffer cleared, size: {}", buffer_.size());
 
+        // Timer pour les délais de requêtes
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
         timer->expires_after(std::chrono::seconds(5));
 
         std::weak_ptr<boost::asio::steady_timer> weak_timer = timer;
-
         timer->async_wait([this, self, weak_timer](boost::system::error_code ec)
                           {
                               auto timer = weak_timer.lock();
@@ -53,7 +66,7 @@ namespace Softadastra
                                   close_socket();
                               } });
 
-        // Appeler la méthode async_read pour SSL
+        // Lecture de la requête
         boost::beast::http::async_read(socket_, buffer_, req_,
                                        [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
                                        {
@@ -61,12 +74,21 @@ namespace Softadastra
 
                                            if (ec)
                                            {
-                                               spdlog::error("Error during async_read: {}", ec.message());
+                                               spdlog::error("Error during async_read: {} (SSL error: {})", ec.message(), ec.value());
                                                close_socket();
                                                return;
                                            }
 
                                            spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
+
+                                           // Vérification WAF avant de traiter la requête
+                                           if (!waf_check_request(req_))
+                                           {
+                                               spdlog::warn("Suspicious request blocked.");
+                                               send_error("Forbidden: Suspicious request");
+                                               return;
+                                           }
+
                                            spdlog::info("Method: {}", req_.method_string());
                                            spdlog::info("Target: {}", req_.target());
                                            spdlog::info("Body: {}", req_.body());
@@ -130,7 +152,7 @@ namespace Softadastra
                                         {
                                             if (ec)
                                             {
-                                                spdlog::error("Error sending response: {}", ec.message());
+                                                spdlog::error("Error sending response: {} (SSL error: {})", ec.message(), ec.value());
                                                 return;
                                             }
                                             spdlog::info("Response sent successfully.");
@@ -160,6 +182,41 @@ namespace Softadastra
         {
             spdlog::error("Socket already closed or not open.");
         }
+    }
+
+    bool Session::waf_check_request(const boost::beast::http::request<boost::beast::http::string_body> &req)
+    {
+        // Exemple simple de vérification (ex. XSS ou injection SQL)
+        if (req.target().find("<script>") != std::string::npos)
+        {
+            spdlog::warn("Possible XSS attack detected in URL: {}", req.target());
+            return false;
+        }
+
+        if (req.body().find("SELECT * FROM") != std::string::npos)
+        {
+            spdlog::warn("Possible SQL injection detected in body: {}", req.body());
+            return false;
+        }
+
+        // Limitation de la taille des en-têtes et du corps
+        if (req.body().size() > MAX_REQUEST_BODY_SIZE)
+        {
+            spdlog::warn("Request body too large: {} bytes", req.body().size());
+            return false;
+        }
+
+        // Vérification des en-têtes (par exemple, User-Agent)
+        if (req.find("User-Agent") != req.end() &&
+            req["User-Agent"].find("curl") != std::string::npos)
+        {
+            spdlog::warn("Suspicious User-Agent detected: {}", req["User-Agent"]);
+            return false;
+        }
+
+        // Autres vérifications peuvent être ajoutées ici...
+
+        return true;
     }
 
 } // namespace Softadastra
