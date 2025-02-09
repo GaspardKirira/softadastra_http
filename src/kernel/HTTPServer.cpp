@@ -12,7 +12,6 @@
 namespace Softadastra
 {
 
-    // Constructeur du serveur HTTP sans SSL
     HTTPServer::HTTPServer(Config &config)
         : config_(config),
           io_context_(std::make_shared<net::io_context>()),
@@ -22,7 +21,6 @@ namespace Softadastra
           request_thread_pool_(NUMBER_OF_THREADS),
           io_threads_()
     {
-        // Validation du port
         int newPort = config_.getServerPort();
         if (newPort < 1024 || newPort > 65535)
         {
@@ -30,7 +28,6 @@ namespace Softadastra
             throw std::invalid_argument("Port number out of range (1024-65535)");
         }
 
-        // Configuration de l'acceptor avec gestion d'erreurs détaillées
         tcp::endpoint endpoint(boost::asio::ip::address_v4::any(), static_cast<unsigned short>(newPort));
         acceptor_ = std::make_unique<tcp::acceptor>(*io_context_);
 
@@ -68,19 +65,15 @@ namespace Softadastra
     {
         try
         {
-            // Configure les routes (avant de démarrer le serveur)
             route_configurator_->configure_routes();
             spdlog::info("Routes configured successfully.");
 
-            // Informations initiales sur le serveur
             spdlog::info("Softadastra/master server is running at http://127.0.0.1:{}", config_.getServerPort());
             spdlog::info("Waiting for incoming connections...");
 
-            // Démarrer l'acceptation des connexions (avant de lancer les threads)
             start_accept();
             spdlog::info("Started accepting connections.");
 
-            // Créer les threads pour exécuter l'io_context
             for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
             {
                 io_threads_.emplace_back([this, i]()
@@ -89,13 +82,12 @@ namespace Softadastra
                                          {
                                              spdlog::info("Thread {} started running io_context.", i);
                                              
-                                             // S'assurer que io_context est prêt à fonctionner
                                              if (io_context_ && io_context_->stopped()) {
                                                  spdlog::warn("io_context is stopped, restarting...");
-                                                 io_context_->restart();  // Redémarre io_context si nécessaire
+                                                 io_context_->restart(); 
                                              }
                                              
-                                             io_context_->run();  // Lancer l'io_context dans ce thread
+                                             io_context_->run();  
                                          }
                                          catch (const std::exception &e)
                                          {
@@ -103,7 +95,6 @@ namespace Softadastra
                                          } });
             }
 
-            // Attendre que tous les threads aient terminé
             for (auto &t : io_threads_)
             {
                 if (t.joinable())
@@ -119,7 +110,7 @@ namespace Softadastra
 
     void HTTPServer::start_accept()
     {
-        auto socket = std::make_shared<tcp::socket>(*io_context_); // Pas besoin de ssl::stream ici
+        auto socket = std::make_shared<tcp::socket>(*io_context_);
 
         try
         {
@@ -167,7 +158,7 @@ namespace Softadastra
         catch (const std::exception &e)
         {
             spdlog::error("Error in client session for client {}: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
-            socket_ptr->close(); // Attempt to close the socket if error occurs
+            socket_ptr->close();
         }
     }
 
