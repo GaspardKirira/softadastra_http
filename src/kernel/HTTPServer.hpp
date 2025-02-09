@@ -88,7 +88,11 @@ namespace Softadastra
          */
         void handle_client(std::shared_ptr<ssl_socket> socket_ptr, Router &router);
 
-        Config &config_;                                        ///< Configuration object for the server settings.
+        void close_socket(std::shared_ptr<ssl::stream<tcp::socket>> socket);
+
+        void log_ssl_error(const boost::system::error_code &ec, std::shared_ptr<ssl::stream<tcp::socket>> socket);
+
+            Config &config_;                                    ///< Configuration object for the server settings.
         std::shared_ptr<net::io_context> io_context_;           ///< I/O context for asynchronous operations.
         std::unique_ptr<tcp::acceptor> acceptor_;               ///< Acceptor for accepting incoming TCP connections.
         Router router_;                                         ///< Router used to route HTTP requests.

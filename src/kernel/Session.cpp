@@ -105,6 +105,7 @@ namespace Softadastra
             return;
         }
 
+        // Vérification de la taille de la requête
         if (req_.body().size() > MAX_REQUEST_SIZE)
         {
             spdlog::warn("Request too large: {} bytes", req_.body().size());
@@ -186,13 +187,14 @@ namespace Softadastra
 
     bool Session::waf_check_request(const boost::beast::http::request<boost::beast::http::string_body> &req)
     {
-        // Exemple simple de vérification (ex. XSS ou injection SQL)
+        // Exemple simple de détection XSS
         if (req.target().find("<script>") != std::string::npos)
         {
             spdlog::warn("Possible XSS attack detected in URL: {}", req.target());
             return false;
         }
 
+        // Vérification d'une injection SQL basique
         if (req.body().find("SELECT * FROM") != std::string::npos)
         {
             spdlog::warn("Possible SQL injection detected in body: {}", req.body());
@@ -206,15 +208,14 @@ namespace Softadastra
             return false;
         }
 
-        // Vérification des en-têtes (par exemple, User-Agent)
+        // Exemple de détection d'un User-Agent suspect
         if (req.find("User-Agent") != req.end() &&
-            req["User-Agent"].find("curl") != std::string::npos)
+            req["User-Agent"].find("curl") != std::string::npos &&
+            req["User-Agent"].find("8.5.0") == std::string::npos) // Ne bloque pas curl/8.5.0
         {
             spdlog::warn("Suspicious User-Agent detected: {}", req["User-Agent"]);
             return false;
         }
-
-        // Autres vérifications peuvent être ajoutées ici...
 
         return true;
     }

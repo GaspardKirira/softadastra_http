@@ -45,3 +45,8 @@ listen 443 ssl;
 
 curl -v --tlsv1.2 -k -H "User-Agent: CustomAgent" https://127.0.0.1:8080/
 wrk -t2 -c2 -d10s https://127.0.0.1:8080/
+
+
+=============================================================================
+echo -n | openssl s_client -connect localhost:8080 -tls1_2
+openssl s_client -connect localhost:8080 -tls1_2 -verify 0

@@ -8,8 +8,8 @@ project(MonProjet CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Weffc++ -g -fsanitize=address")
 
-# Ajouter Boost (vérifie si Boost est installé sur ton système)
-find_package(Boost 1.78 REQUIRED)
+# Trouver Boost, y compris les composants nécessaires
+find_package(Boost 1.78 REQUIRED COMPONENTS filesystem system)
 
 # Si Boost a été trouvé, lier Boost à ton projet
 if (Boost_FOUND)
@@ -49,8 +49,8 @@ add_executable(prog ${SOURCE_FILES})
 # Lier la bibliothèque MySQL Connector/C++ au projet
 target_link_libraries(prog PRIVATE mysqlcppconn)
 
-# Lier Boost à ton projet
-target_link_libraries(prog PRIVATE ${Boost_LIBRARIES})
+# Lier Boost à ton projet en utilisant les fichiers spécifiques au lieu des alias
+target_link_libraries(prog PRIVATE ${Boost_FILESYSTEM_LIBRARY} ${Boost_SYSTEM_LIBRARY})
 
 # Lier spdlog à ton projet
 target_link_libraries(prog PRIVATE spdlog)
