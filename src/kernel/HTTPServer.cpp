@@ -14,10 +14,7 @@
 namespace Softadastra
 {
 
-<<<<<<< HEAD
     // Constructeur du serveur HTTP avec SSL
-=======
->>>>>>> version-no-SSL
     HTTPServer::HTTPServer(Config &config)
         : config_(config),
           io_context_(std::make_shared<net::io_context>()),
@@ -126,8 +123,6 @@ namespace Softadastra
         }
 
         // Validation du port
-=======
->>>>>>> version-no-SSL
         int newPort = config_.getServerPort();
         if (newPort < 1024 || newPort > 65535)
         {
@@ -175,12 +170,9 @@ namespace Softadastra
             route_configurator_->configure_routes();
             spdlog::info("Routes configured successfully.");
 
-<<<<<<< HEAD
             // Informations initiales sur le serveur
             spdlog::info("Softadastra/master server is running at https://127.0.0.1:{}", config_.getServerPort());
-=======
             spdlog::info("Softadastra/master server is running at http://127.0.0.1:{}", config_.getServerPort());
->>>>>>> version-no-SSL
             spdlog::info("Waiting for incoming connections...");
 
             start_accept();
@@ -193,17 +185,7 @@ namespace Softadastra
                                          try
                                          {
                                              spdlog::info("Thread {} started running io_context.", i);
-<<<<<<< HEAD
                                              io_context_->run();  // Lancer l'io_context dans ce thread
-=======
-                                             
-                                             if (io_context_ && io_context_->stopped()) {
-                                                 spdlog::warn("io_context is stopped, restarting...");
-                                                 io_context_->restart(); 
-                                             }
-                                             
-                                             io_context_->run();  
->>>>>>> version-no-SSL
                                          }
                                          catch (const std::exception &e)
                                          {
@@ -225,11 +207,8 @@ namespace Softadastra
     }
     void HTTPServer::start_accept()
     {
-<<<<<<< HEAD
         auto socket = std::make_shared<ssl::stream<tcp::socket>>(*io_context_, ssl_context_);
-=======
         auto socket = std::make_shared<tcp::socket>(*io_context_);
->>>>>>> version-no-SSL
 
         try
         {
@@ -294,7 +273,6 @@ namespace Softadastra
         }
         else if (ec == boost::asio::error::connection_reset)
         {
-<<<<<<< HEAD
             spdlog::error("SSL handshake failed due to connection reset by peer.");
         }
         else
@@ -310,10 +288,8 @@ namespace Softadastra
             ERR_error_string_n(ssl_error, err_buff, sizeof(err_buff));
             spdlog::error("OpenSSL Error: {}", err_buff);
             ssl_error = ERR_get_error();
-=======
             spdlog::error("Error in client session for client {}: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
             socket_ptr->close();
->>>>>>> version-no-SSL
         }
     }
 
