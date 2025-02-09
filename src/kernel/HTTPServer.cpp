@@ -26,63 +26,53 @@ namespace Softadastra
         try
         {
             // Vérification des fichiers de certificat et de clé SSL avant de les charger
-            const std::string cert_path = "../certs/server-cert.pem";
-            const std::string key_path = "../certs/server-key.pem";
-
-            if (!boost::filesystem::exists(cert_path) || !boost::filesystem::exists(key_path))
+            if (!boost::filesystem::exists("../certs/server-cert.pem") || !boost::filesystem::exists("../certs/server-key.pem"))
             {
-                spdlog::error("Certificate or private key file not found! Path: cert: {}, key: {}", cert_path, key_path);
+                spdlog::error("Certificate or private key file not found!");
                 throw std::runtime_error("Certificate or private key file not found!");
             }
 
-            spdlog::info("Loading SSL certificate from: {}", cert_path);
-            ssl_context_.use_certificate_chain_file(cert_path);
+            spdlog::info("Loading SSL certificate from certs/server-cert.pem");
+            ssl_context_.use_certificate_chain_file("../certs/server-cert.pem");
 
-            spdlog::info("Loading SSL private key from: {}", key_path);
-            ssl_context_.use_private_key_file(key_path, boost::asio::ssl::context::pem);
+            spdlog::info("Loading SSL private key from certs/server-key.pem");
+            ssl_context_.use_private_key_file("../certs/server-key.pem", boost::asio::ssl::context::pem);
 
-            // Configuration des options SSL
-            ssl_context_.set_verify_mode(boost::asio::ssl::verify_none); // Désactivation de la vérification des certificats des clients
+            ssl_context_.set_verify_mode(boost::asio::ssl::verify_none);
 
-            // Désactiver SSLv2 et forcer uniquement TLSv1.2
-            ssl_context_.set_options(boost::asio::ssl::context::default_workarounds |
-                                     boost::asio::ssl::context::no_sslv2 |
-                                     boost::asio::ssl::context::single_dh_use);
+            ssl_context_.set_options(ssl::context::default_workarounds |
+                                     ssl::context::no_sslv2 |
+                                     ssl::context::single_dh_use);
 
-            // OpenSSL va gérer la version du protocole, donc tu n'as pas besoin d'une constante tlsv1_2
-            // Cependant, la version la plus récente par défaut dans OpenSSL est TLSv1.2, sauf si spécifié autrement
-
-            // Fonction de callback pour la vérification du certificat
             ssl_context_.set_verify_callback([](bool preverified, boost::asio::ssl::verify_context &verify_context)
                                              {
-        // On ne vérifie plus le certificat, mais on garde le callback pour enregistrer des logs si nécessaire
-        if (!preverified)
-        {
-            spdlog::warn("SSL verification was not preverified (but is disabled).");
-
-            unsigned long errors = ERR_get_error();
-            if (errors)
+            if (!preverified)
             {
-                char err_buff[256];
-                ERR_error_string_n(errors, err_buff, sizeof(err_buff));
-                spdlog::warn("SSL verification error (though disabled): {}", err_buff);
-            }
+                spdlog::error("SSL verification failed.");
+                unsigned long errors = ERR_get_error();
+                if (errors)
+                {
+                    char err_buff[256];
+                    ERR_error_string_n(errors, err_buff, sizeof(err_buff));
+                    spdlog::error("SSL verification error: {}", err_buff);
+                }
 
-            // Information supplémentaire sur le certificat échoué
-            X509 *cert = X509_STORE_CTX_get_current_cert(verify_context.native_handle());
-            if (cert)
-            {
-                char *line = nullptr;
-                BIO *bio = BIO_new(BIO_s_mem());
-                X509_print(bio, cert);
-                long len = BIO_get_mem_data(bio, &line);
-                std::string cert_info(line, len);
-                BIO_free(bio);
-                spdlog::warn("Failed certificate info (though disabled):\n{}", cert_info);
+                // Ajout d'informations sur le certificat échoué, comme l'empreinte du certificat
+                X509 *cert = X509_STORE_CTX_get_current_cert(verify_context.native_handle());
+                if (cert)
+                {
+                    char *line = nullptr;
+                    BIO *bio = BIO_new(BIO_s_mem());
+                    X509_print(bio, cert);
+                    long len = BIO_get_mem_data(bio, &line);
+                    std::string cert_info(line, len);
+                    BIO_free(bio);
+                    spdlog::error("Failed certificate info:\n{}", cert_info);
+                }
             }
-        }
-        return true; }); // Toujours retourner true pour accepter la connexion
-            spdlog::info("SSL/TLS context initialized successfully (client certificate verification disabled).");
+            return preverified; });
+
+            spdlog::info("SSL/TLS context initialized successfully.");
         }
         catch (const std::exception &e)
         {
@@ -177,6 +167,7 @@ namespace Softadastra
             spdlog::error("Error in HTTPServer::run(): {}", e.what());
         }
     }
+
     void HTTPServer::start_accept()
     {
         auto socket = std::make_shared<ssl::stream<tcp::socket>>(*io_context_, ssl_context_);
@@ -188,11 +179,6 @@ namespace Softadastra
                                         if (!ec)
                                         {
                                             spdlog::info("Client connected from: {}", socket->lowest_layer().remote_endpoint().address().to_string());
-
-                                            // Désactiver temporairement les tickets de session
-                                            // Note: Ceci est juste un test; ajustez selon vos besoins réels
-                                            // SSL_CTX_set_session_cache_mode(ssl_context_.native_handle(), SSL_SESS_CACHE_OFF);
-
                                             socket->async_handshake(ssl::stream_base::server,
                                                                     [this, socket](boost::system::error_code ec)
                                                                     {
@@ -201,20 +187,33 @@ namespace Softadastra
                                                                             spdlog::info("SSL handshake successful.");
                                                                             request_thread_pool_.enqueue([this, socket]()
                                                                                                          {
-                                                    try
-                                                    {
-                                                        handle_client(socket, router_);
-                                                    }
-                                                    catch (const std::exception &e)
-                                                    {
-                                                        spdlog::error("Error handling client: {}", e.what());
-                                                        close_socket(socket);
-                                                    } });
+                                                                            try
+                                                                            {
+                                                                                handle_client(socket, router_);
+                                                                            }
+                                                                            catch (const std::exception &e)
+                                                                            {
+                                                                                spdlog::error("Error handling client: {}", e.what());
+                                                                                socket->lowest_layer().close(); // Close socket on failure
+                                                                            } });
                                                                         }
                                                                         else
                                                                         {
-                                                                            log_ssl_error(ec, socket);
-                                                                            close_socket(socket);
+                                                                            spdlog::error("SSL handshake failed with error code {}: {}", ec.value(), ec.message());
+                                                                            if (ec == boost::asio::error::eof)
+                                                                            {
+                                                                                spdlog::error("SSL handshake failed due to unexpected EOF.");
+                                                                            }
+                                                                            else if (ec == boost::asio::error::connection_reset)
+                                                                            {
+                                                                                spdlog::error("SSL handshake failed due to connection reset by peer.");
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                spdlog::error("SSL handshake failed with unknown error.");
+                                                                            }
+
+                                                                            socket->lowest_layer().close(); // Close socket if handshake fails
                                                                         }
                                                                     });
                                         }
@@ -230,49 +229,6 @@ namespace Softadastra
         {
             spdlog::error("Exception during async_accept: {}", e.what());
             acceptor_->close();
-        }
-    }
-
-    void HTTPServer::close_socket(std::shared_ptr<ssl::stream<tcp::socket>> socket)
-    {
-        boost::system::error_code ec;
-        socket->lowest_layer().shutdown(tcp::socket::shutdown_both, ec);
-        if (ec && ec != boost::system::error_code{})
-        {
-            spdlog::error("Failed to shutdown socket: {} (Error code: {})", ec.message(), ec.value());
-        }
-        socket->lowest_layer().close(ec);
-        if (ec && ec != boost::system::error_code{})
-        {
-            spdlog::error("Failed to close socket: {} (Error code: {})", ec.message(), ec.value());
-        }
-    }
-
-    void HTTPServer::log_ssl_error(const boost::system::error_code &ec, std::shared_ptr<ssl::stream<tcp::socket>>)
-    {
-        spdlog::error("SSL handshake failed with error code {}: {}", ec.value(), ec.message());
-
-        if (ec == boost::asio::error::eof)
-        {
-            spdlog::error("SSL handshake failed due to unexpected EOF.");
-        }
-        else if (ec == boost::asio::error::connection_reset)
-        {
-            spdlog::error("SSL handshake failed due to connection reset by peer.");
-        }
-        else
-        {
-            spdlog::error("SSL handshake failed with unknown error.");
-        }
-
-        // Log des erreurs OpenSSL supplémentaires
-        unsigned long ssl_error = ERR_get_error();
-        while (ssl_error != 0)
-        {
-            char err_buff[256];
-            ERR_error_string_n(ssl_error, err_buff, sizeof(err_buff));
-            spdlog::error("OpenSSL Error: {}", err_buff);
-            ssl_error = ERR_get_error();
         }
     }
 
