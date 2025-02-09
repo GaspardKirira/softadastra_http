@@ -7,24 +7,37 @@
 namespace Softadastra
 {
 
-    // Constructeur modifié pour accepter un tcp::socket (sans SSL)
-    Session::Session(tcp::socket socket, Router &router)
-        : socket_(std::move(socket)), router_(router), buffer_(32768), req_(), socket_mutex_() // Buffer augmenté
+    // Constructeur modifié pour accepter un ssl_socket
+    Session::Session(ssl_socket socket, Router &router)
+        : socket_(std::move(socket)), router_(router), buffer_(8060), req_()
     {
-        spdlog::info("Session initialized for client: {}", socket_.remote_endpoint().address().to_string());
+        spdlog::info("Session initialized for client: {}", socket_.lowest_layer().remote_endpoint().address().to_string());
     }
 
     void Session::run()
     {
         auto self = shared_from_this();
 
-        spdlog::info("Connection established. Reading request...");
-        read_request();
+        // SSL Handshake
+        socket_.async_handshake(boost::asio::ssl::stream_base::server,
+                                [this, self](boost::system::error_code ec)
+                                {
+                                    if (ec)
+                                    {
+                                        spdlog::error("SSL handshake failed: {}", ec.message());
+                                        close_socket();
+                                        return;
+                                    }
+
+                                    spdlog::info("SSL handshake successful.");
+                                    read_request();
+                                });
     }
 
     void Session::read_request()
     {
-        if (!socket_.is_open())
+        // Vérification si le socket est ouvert
+        if (!socket_.lowest_layer().is_open())
         {
             spdlog::error("Socket is not open, cannot read request!");
             return;
@@ -35,40 +48,33 @@ namespace Softadastra
 
         // Timer pour les délais de requêtes
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
-        timer->expires_after(std::chrono::seconds(10)); // Augmenté à 10 secondes
+        timer->expires_after(std::chrono::seconds(5));
 
         std::weak_ptr<boost::asio::steady_timer> weak_timer = timer;
         timer->async_wait([this, self, weak_timer](boost::system::error_code ec)
                           {
-                          auto timer = weak_timer.lock();
-                          if (!timer)
-                          {
-                              spdlog::info("Timer is no longer available.");
-                              return;
-                          }
+                              auto timer = weak_timer.lock();
+                              if (!timer)
+                              {
+                                  spdlog::info("Timer is no longer available.");
+                                  return;
+                              }
 
-                          if (!ec)
-                          {
-                              spdlog::warn("Timeout: No request received after 10 seconds! Closing connection.");
-                              close_socket();
-                          } });
+                              if (!ec)
+                              {
+                                  spdlog::warn("Timeout: No request received after 5 seconds!");
+                                  close_socket();
+                              } });
 
         // Lecture de la requête
         boost::beast::http::async_read(socket_, buffer_, req_,
                                        [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
                                        {
-                                           if (ec == boost::asio::error::eof) // Handle connection closed by client
-                                           {
-                                               spdlog::warn("Connection closed by client during read.");
-                                               close_socket();
-                                               return;
-                                           }
-
                                            timer->cancel();
 
                                            if (ec)
                                            {
-                                               spdlog::error("Error during async_read: {} ({} bytes transferred)", ec.message(), bytes_transferred);
+                                               spdlog::error("Error during async_read: {} (SSL error: {})", ec.message(), ec.value());
                                                close_socket();
                                                return;
                                            }
@@ -99,13 +105,6 @@ namespace Softadastra
             return;
         }
 
-        // Vérification de la validité du socket avant de continuer
-        if (!socket_.is_open())
-        {
-            spdlog::error("Socket is closed, cannot process the request.");
-            return;
-        }
-
         // Vérification de la taille de la requête
         if (req_.body().size() > MAX_REQUEST_SIZE)
         {
@@ -114,14 +113,11 @@ namespace Softadastra
             return;
         }
 
-        spdlog::info("Handling request...");
-
         boost::beast::http::response<boost::beast::http::string_body> res;
         bool success = router_.handle_request(req_, res);
 
         if (!success)
         {
-            spdlog::warn("Failed to handle request, sending error response.");
             if (res.result() == boost::beast::http::status::method_not_allowed)
             {
                 send_error("Method Not Allowed");
@@ -137,22 +133,13 @@ namespace Softadastra
             return;
         }
 
-        spdlog::info("Request successfully handled, sending response.");
-
-        try
-        {
-            send_response(res);
-        }
-        catch (const std::exception &e)
-        {
-            spdlog::error("Error sending response: {}", e.what());
-            send_error("Failed to send response");
-        }
+        send_response(res);
     }
 
     void Session::send_response(boost::beast::http::response<boost::beast::http::string_body> &res)
     {
-        if (!socket_.is_open())
+        // Vérification si le socket est ouvert (en utilisant lowest_layer)
+        if (!socket_.lowest_layer().is_open())
         {
             spdlog::error("Socket is not open, cannot send response!");
             return;
@@ -166,63 +153,35 @@ namespace Softadastra
                                         {
                                             if (ec)
                                             {
-                                                spdlog::error("Error sending response: {}", ec.message());
+                                                spdlog::error("Error sending response: {} (SSL error: {})", ec.message(), ec.value());
                                                 return;
                                             }
                                             spdlog::info("Response sent successfully.");
-
-                                            // Shutdown and close socket after sending response
-                                            socket_.shutdown(tcp::socket::shutdown_both);
-                                            socket_.close();
+                                            socket_.lowest_layer().shutdown(tcp::socket::shutdown_both);
+                                            socket_.lowest_layer().close();
                                         });
     }
 
     void Session::send_error(const std::string &error_message)
     {
-        // Gère l'envoi d'une réponse d'erreur de manière propre
         boost::beast::http::response<boost::beast::http::string_body> res;
-        res.result(boost::beast::http::status::internal_server_error);
-        res.body() = error_message;
-        res.prepare_payload();
+        Response::error_response(res, boost::beast::http::status::bad_request, error_message);
 
-        if (socket_.is_open())
-        {
-            try
-            {
-                boost::beast::http::write(socket_, res);
-            }
-            catch (const boost::system::system_error &e)
-            {
-                spdlog::error("Error sending error response: {}", e.what());
-            }
-        }
-        else
-        {
-            spdlog::error("Socket already closed. Could not send error response.");
-        }
+        send_response(res);
     }
 
     void Session::close_socket()
     {
-        std::lock_guard<std::mutex> lock(socket_mutex_);
-
-        try
+        boost::system::error_code ignored_ec;
+        // Vérification si le socket est ouvert (en utilisant lowest_layer)
+        if (socket_.lowest_layer().is_open())
         {
-            if (socket_.is_open())
-            {
-                boost::system::error_code ignored_ec;
-                socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
-                socket_.close(ignored_ec);
-                spdlog::info("Socket closed.");
-            }
-            else
-            {
-                spdlog::warn("Socket already closed or not open.");
-            }
+            socket_.lowest_layer().close(ignored_ec);
+            spdlog::info("Socket closed.");
         }
-        catch (const std::exception &e)
+        else
         {
-            spdlog::error("Exception while closing socket: {}", e.what());
+            spdlog::error("Socket already closed or not open.");
         }
     }
 
