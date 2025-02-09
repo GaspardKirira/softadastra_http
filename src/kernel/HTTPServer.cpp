@@ -25,7 +25,6 @@ namespace Softadastra
           io_threads_(),
           ssl_context_(ssl::context::sslv23) // Crée un contexte SSL/TLS
     {
-<<<<<<< HEAD
         try
         {
             // Vérification des chemins des certificats SSL
@@ -130,6 +129,7 @@ namespace Softadastra
             throw std::invalid_argument("Port number out of range (1024-65535)");
         }
 
+        // Configuration de l'acceptor avec gestion d'erreurs détaillées
         tcp::endpoint endpoint(boost::asio::ip::address_v4::any(), static_cast<unsigned short>(newPort));
         acceptor_ = std::make_unique<tcp::acceptor>(*io_context_);
 
@@ -167,17 +167,19 @@ namespace Softadastra
     {
         try
         {
+            // Configure les routes (avant de démarrer le serveur)
             route_configurator_->configure_routes();
             spdlog::info("Routes configured successfully.");
 
             // Informations initiales sur le serveur
             spdlog::info("Softadastra/master server is running at https://127.0.0.1:{}", config_.getServerPort());
-            spdlog::info("Softadastra/master server is running at http://127.0.0.1:{}", config_.getServerPort());
             spdlog::info("Waiting for incoming connections...");
 
+            // Démarrer l'acceptation des connexions (avant de lancer les threads)
             start_accept();
             spdlog::info("Started accepting connections.");
 
+            // Créer les threads pour exécuter l'io_context
             for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
             {
                 io_threads_.emplace_back([this, i]()
@@ -193,6 +195,7 @@ namespace Softadastra
                                          } });
             }
 
+            // Attendre que tous les threads aient terminé
             for (auto &t : io_threads_)
             {
                 if (t.joinable())
@@ -208,7 +211,6 @@ namespace Softadastra
     void HTTPServer::start_accept()
     {
         auto socket = std::make_shared<ssl::stream<tcp::socket>>(*io_context_, ssl_context_);
-        auto socket = std::make_shared<tcp::socket>(*io_context_);
 
         try
         {
@@ -288,8 +290,6 @@ namespace Softadastra
             ERR_error_string_n(ssl_error, err_buff, sizeof(err_buff));
             spdlog::error("OpenSSL Error: {}", err_buff);
             ssl_error = ERR_get_error();
-            spdlog::error("Error in client session for client {}: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
-            socket_ptr->close();
         }
     }
 
