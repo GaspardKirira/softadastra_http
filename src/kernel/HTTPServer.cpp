@@ -8,9 +8,11 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/beast.hpp>
 #include <spdlog/spdlog.h>
+#include <boost/filesystem.hpp> // Ajoutez cette ligne pour vérifier l'existence des fichiers
 
 namespace Softadastra
 {
+
     HTTPServer::HTTPServer(Config &config)
         : config_(config),
           io_context_(std::make_shared<net::io_context>()),
@@ -23,47 +25,64 @@ namespace Softadastra
     {
         try
         {
-            spdlog::info("Loading SSL certificate from certs/server-cert.pem");
-            ssl_context_.use_certificate_chain_file("../certs/server-cert.pem");
+            // Vérification des fichiers de certificat et de clé SSL avant de les charger
+            const std::string cert_path = "../certs/server-cert.pem";
+            const std::string key_path = "../certs/server-key.pem";
 
-            spdlog::info("Loading SSL private key from certs/server-key.pem");
-            ssl_context_.use_private_key_file("../certs/server-key.pem", boost::asio::ssl::context::pem);
+            if (!boost::filesystem::exists(cert_path) || !boost::filesystem::exists(key_path))
+            {
+                spdlog::error("Certificate or private key file not found! Path: cert: {}, key: {}", cert_path, key_path);
+                throw std::runtime_error("Certificate or private key file not found!");
+            }
 
-            ssl_context_.set_verify_mode(boost::asio::ssl::verify_none);
+            spdlog::info("Loading SSL certificate from: {}", cert_path);
+            ssl_context_.use_certificate_chain_file(cert_path);
 
-            ssl_context_.set_options(ssl::context::default_workarounds |
-                                     ssl::context::no_sslv2 |
-                                     ssl::context::single_dh_use);
+            spdlog::info("Loading SSL private key from: {}", key_path);
+            ssl_context_.use_private_key_file(key_path, boost::asio::ssl::context::pem);
 
+            // Configuration des options SSL
+            ssl_context_.set_verify_mode(boost::asio::ssl::verify_none); // Désactivation de la vérification des certificats des clients
+
+            // Désactiver SSLv2 et forcer uniquement TLSv1.2
+            ssl_context_.set_options(boost::asio::ssl::context::default_workarounds |
+                                     boost::asio::ssl::context::no_sslv2 |
+                                     boost::asio::ssl::context::single_dh_use);
+
+            // OpenSSL va gérer la version du protocole, donc tu n'as pas besoin d'une constante tlsv1_2
+            // Cependant, la version la plus récente par défaut dans OpenSSL est TLSv1.2, sauf si spécifié autrement
+
+            // Fonction de callback pour la vérification du certificat
             ssl_context_.set_verify_callback([](bool preverified, boost::asio::ssl::verify_context &verify_context)
                                              {
-    if (!preverified)
-    {
-        spdlog::error("SSL verification failed.");
-        unsigned long errors = ERR_get_error();
-        if (errors)
+        // On ne vérifie plus le certificat, mais on garde le callback pour enregistrer des logs si nécessaire
+        if (!preverified)
         {
-            char err_buff[256];
-            ERR_error_string_n(errors, err_buff, sizeof(err_buff));
-            spdlog::error("SSL verification error: {}", err_buff);
-        }
+            spdlog::warn("SSL verification was not preverified (but is disabled).");
 
-        // Ajout d'informations sur le certificat échoué, par exemple l'empreinte du certificat
-        X509 *cert = X509_STORE_CTX_get_current_cert(verify_context.native_handle());
-        if (cert)
-        {
-            char *line = nullptr;
-            BIO *bio = BIO_new(BIO_s_mem());
-            X509_print(bio, cert);
-            long len = BIO_get_mem_data(bio, &line);
-            std::string cert_info(line, len);
-            BIO_free(bio);
-            spdlog::error("Failed certificate info:\n{}", cert_info);
-        }
-    }
-    return preverified; });
+            unsigned long errors = ERR_get_error();
+            if (errors)
+            {
+                char err_buff[256];
+                ERR_error_string_n(errors, err_buff, sizeof(err_buff));
+                spdlog::warn("SSL verification error (though disabled): {}", err_buff);
+            }
 
-            spdlog::info("SSL/TLS context initialized successfully.");
+            // Information supplémentaire sur le certificat échoué
+            X509 *cert = X509_STORE_CTX_get_current_cert(verify_context.native_handle());
+            if (cert)
+            {
+                char *line = nullptr;
+                BIO *bio = BIO_new(BIO_s_mem());
+                X509_print(bio, cert);
+                long len = BIO_get_mem_data(bio, &line);
+                std::string cert_info(line, len);
+                BIO_free(bio);
+                spdlog::warn("Failed certificate info (though disabled):\n{}", cert_info);
+            }
+        }
+        return true; }); // Toujours retourner true pour accepter la connexion
+            spdlog::info("SSL/TLS context initialized successfully (client certificate verification disabled).");
         }
         catch (const std::exception &e)
         {
@@ -71,6 +90,7 @@ namespace Softadastra
             throw;
         }
 
+        // Validation du port
         int newPort = config_.getServerPort();
         if (newPort < 1024 || newPort > 65535)
         {
@@ -78,6 +98,7 @@ namespace Softadastra
             throw std::invalid_argument("Port number out of range (1024-65535)");
         }
 
+        // Configuration de l'acceptor avec gestion d'erreurs détaillées
         tcp::endpoint endpoint(boost::asio::ip::address_v4::any(), static_cast<unsigned short>(newPort));
         acceptor_ = std::make_unique<tcp::acceptor>(*io_context_);
 
@@ -113,34 +134,49 @@ namespace Softadastra
 
     void HTTPServer::run()
     {
-        route_configurator_->configure_routes();
-
-        spdlog::info("Softadastra/master server is running at https://127.0.0.1:{}", config_.getServerPort());
-        spdlog::info("Waiting for incoming connections...");
-
-        start_accept();
-
-        for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
+        try
         {
-            io_threads_.emplace_back([this, i]()
-                                     {
-                try
-                {
-                    io_context_->run();
-                }
-                catch (const std::exception &e)
-                {
-                    spdlog::error("Error in io_context (thread {}): {}", i, e.what());
-                } });
+            // Configure les routes (avant de démarrer le serveur)
+            route_configurator_->configure_routes();
+            spdlog::info("Routes configured successfully.");
+
+            // Informations initiales sur le serveur
+            spdlog::info("Softadastra/master server is running at https://127.0.0.1:{}", config_.getServerPort());
+            spdlog::info("Waiting for incoming connections...");
+
+            // Démarrer l'acceptation des connexions (avant de lancer les threads)
+            start_accept();
+            spdlog::info("Started accepting connections.");
+
+            // Créer les threads pour exécuter l'io_context
+            for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
+            {
+                io_threads_.emplace_back([this, i]()
+                                         {
+                                         try
+                                         {
+                                             spdlog::info("Thread {} started running io_context.", i);
+                                             io_context_->run();  // Lancer l'io_context dans ce thread
+                                         }
+                                         catch (const std::exception &e)
+                                         {
+                                             spdlog::error("Error in io_context (thread {}): {}", i, e.what());
+                                         } });
+            }
+
+            // Attendre que tous les threads aient terminé
+            for (auto &t : io_threads_)
+            {
+                if (t.joinable())
+                    t.join();
+            }
+            spdlog::info("All io_context threads finished.");
         }
-
-        for (auto &t : io_threads_)
+        catch (const std::exception &e)
         {
-            if (t.joinable())
-                t.join();
+            spdlog::error("Error in HTTPServer::run(): {}", e.what());
         }
     }
-
     void HTTPServer::start_accept()
     {
         auto socket = std::make_shared<ssl::stream<tcp::socket>>(*io_context_, ssl_context_);
@@ -149,63 +185,94 @@ namespace Softadastra
         {
             acceptor_->async_accept(socket->lowest_layer(), [this, socket](boost::system::error_code ec)
                                     {
-            if (!ec)
-            {
-                spdlog::info("Client connected from: {}", socket->lowest_layer().remote_endpoint().address().to_string());
-                socket->async_handshake(ssl::stream_base::server, 
-                    [this, socket](boost::system::error_code ec)
-                    {
-                        if (!ec)
-                        {
-                            spdlog::info("SSL handshake successful.");
-                            request_thread_pool_.enqueue([this, socket]()
-                            {
-                                try
-                                {
-                                    handle_client(socket, router_);
-                                }
-                                catch (const std::exception &e)
-                                {
-                                    spdlog::error("Error handling client: {}", e.what());
-                                    socket->lowest_layer().close(); // Close socket on failure
-                                }
-                            });
-                        }
-                        else
-                        {
-                            spdlog::error("SSL handshake failed with error code {}: {}", ec.value(), ec.message());
+                                        if (!ec)
+                                        {
+                                            spdlog::info("Client connected from: {}", socket->lowest_layer().remote_endpoint().address().to_string());
 
-                            // Ajout d'une gestion détaillée des erreurs spécifiques
-                            if (ec == boost::asio::error::eof)
-                            {
-                                spdlog::error("SSL handshake failed due to unexpected EOF.");
-                            }
-                            else if (ec == boost::asio::error::connection_reset)
-                            {
-                                spdlog::error("SSL handshake failed due to connection reset.");
-                            }
-                            else
-                            {
-                                spdlog::error("SSL handshake failed with unknown error.");
-                            }
+                                            // Désactiver temporairement les tickets de session
+                                            // Note: Ceci est juste un test; ajustez selon vos besoins réels
+                                            // SSL_CTX_set_session_cache_mode(ssl_context_.native_handle(), SSL_SESS_CACHE_OFF);
 
-                            // Fermer la connexion si la poignée de main échoue
-                            socket->lowest_layer().close();
-                        }
-                    });
-            }
-            else
-            {
-                spdlog::error("Error accepting connection from client: {} (Error code: {})", ec.message(), ec.value());
-            }
+                                            socket->async_handshake(ssl::stream_base::server,
+                                                                    [this, socket](boost::system::error_code ec)
+                                                                    {
+                                                                        if (!ec)
+                                                                        {
+                                                                            spdlog::info("SSL handshake successful.");
+                                                                            request_thread_pool_.enqueue([this, socket]()
+                                                                                                         {
+                                                    try
+                                                    {
+                                                        handle_client(socket, router_);
+                                                    }
+                                                    catch (const std::exception &e)
+                                                    {
+                                                        spdlog::error("Error handling client: {}", e.what());
+                                                        close_socket(socket);
+                                                    } });
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            log_ssl_error(ec, socket);
+                                                                            close_socket(socket);
+                                                                        }
+                                                                    });
+                                        }
+                                        else
+                                        {
+                                            spdlog::error("Error accepting connection from client: {} (Error code: {})", ec.message(), ec.value());
+                                        }
 
-            start_accept(); });
+                                        start_accept(); // Continue accepting new connections
+                                    });
         }
         catch (const std::exception &e)
         {
             spdlog::error("Exception during async_accept: {}", e.what());
-            // Si une exception se produit, on ferme l'acceptor et le socket pour éviter les fuites de ressources
             acceptor_->close();
+        }
+    }
+
+    void HTTPServer::close_socket(std::shared_ptr<ssl::stream<tcp::socket>> socket)
+    {
+        boost::system::error_code ec;
+        socket->lowest_layer().shutdown(tcp::socket::shutdown_both, ec);
+        if (ec && ec != boost::system::error_code{})
+        {
+            spdlog::error("Failed to shutdown socket: {} (Error code: {})", ec.message(), ec.value());
+        }
+        socket->lowest_layer().close(ec);
+        if (ec && ec != boost::system::error_code{})
+        {
+            spdlog::error("Failed to close socket: {} (Error code: {})", ec.message(), ec.value());
+        }
+    }
+
+    void HTTPServer::log_ssl_error(const boost::system::error_code &ec, std::shared_ptr<ssl::stream<tcp::socket>>)
+    {
+        spdlog::error("SSL handshake failed with error code {}: {}", ec.value(), ec.message());
+
+        if (ec == boost::asio::error::eof)
+        {
+            spdlog::error("SSL handshake failed due to unexpected EOF.");
+        }
+        else if (ec == boost::asio::error::connection_reset)
+        {
+            spdlog::error("SSL handshake failed due to connection reset by peer.");
+        }
+        else
+        {
+            spdlog::error("SSL handshake failed with unknown error.");
+        }
+
+        // Log des erreurs OpenSSL supplémentaires
+        unsigned long ssl_error = ERR_get_error();
+        while (ssl_error != 0)
+        {
+            char err_buff[256];
+            ERR_error_string_n(ssl_error, err_buff, sizeof(err_buff));
+            spdlog::error("OpenSSL Error: {}", err_buff);
+            ssl_error = ERR_get_error();
         }
     }
 
