@@ -57,7 +57,15 @@ namespace Softadastra
                 return;
             }
 
-            handler_({{"body", body}}, res);
+            // Plutôt que d'ajouter directement "body" à params_, assurez-vous qu'il existe dans le handler
+            if (params_.find("body") != params_.end())
+            {
+                handler_({{"body", body}}, res);
+            }
+            else
+            {
+                Response::error_response(res, http::status::bad_request, "Missing 'body' parameter.");
+            }
         }
     }
 

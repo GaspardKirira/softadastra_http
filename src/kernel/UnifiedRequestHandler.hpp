@@ -5,10 +5,8 @@
 #include "Response.hpp"
 
 using json = nlohmann::json;
-
 namespace Softadastra
 {
-
     class UnifiedRequestHandler : public IRequestHandler
     {
     public:
@@ -23,8 +21,8 @@ namespace Softadastra
             {
                 spdlog::info("Handling GET request for path: {}", req.target());
 
-                // Extraire et traiter les paramètres de la requête (exemple avec id et slug)
-                std::unordered_map<std::string, std::string> params = extract_params(std::string(req.target()));
+                // Extraire et traiter les paramètres de la requête et les segments dynamiques
+                std::unordered_map<std::string, std::string> params = extract_dynamic_params_public(std::string(req.target()));
                 if (!validate_params(params, res))
                 {
                     return; // Si validation échoue, on arrête l'exécution
@@ -59,22 +57,42 @@ namespace Softadastra
             }
         }
 
+        // Méthode publique pour appeler extract_dynamic_params statique
+        static std::unordered_map<std::string, std::string> extract_dynamic_params_public(const std::string &target)
+        {
+            return extract_dynamic_params(target); // Appel à la méthode statique privée
+        }
+
     private:
         std::function<void(const http::request<http::string_body> &, http::response<http::string_body> &)> handler_;
 
-        // Fonction pour extraire les paramètres de la requête
-        std::unordered_map<std::string, std::string> extract_params(const std::string &target)
+        // Fonction statique pour extraire les paramètres dynamiques des segments de l'URL
+        static std::unordered_map<std::string, std::string> extract_dynamic_params(const std::string &target)
         {
             std::unordered_map<std::string, std::string> params;
 
-            // Exemple de simple extraction de paramètres (vous pouvez l'adapter à vos besoins)
-            std::regex regex(R"(\?([^&=]+)=([^&=]+))");
+            // Exemple d'URL avec segments dynamiques : /user/{id}/profile
+            // La regex va capturer {id} et l'associer à un paramètre
+            std::regex regex(R"((\/\w+)(\/\{(\w+)\}))");
             std::smatch matches;
             std::string::const_iterator search_start(target.cbegin());
+
             while (std::regex_search(search_start, target.cend(), matches, regex))
             {
-                params[matches[1]] = matches[2];
+                // match[1] : correspond au segment de l'URL (ex : "/user")
+                // match[2] : correspond au segment dynamique (ex : "{id}")
+                // match[3] : correspond au nom du paramètre dynamique (ex : "id")
+                params[matches[3]] = matches[2]; // On associe le nom du paramètre dynamique à sa valeur
                 search_start = matches.suffix().first;
+            }
+
+            // Exemple de gestion des paramètres de requête (ex: ?id=123&slug=test)
+            std::regex query_regex(R"(\?([^&=]+)=([^&=]+))");
+            std::string::const_iterator query_start(target.cbegin());
+            while (std::regex_search(query_start, target.cend(), matches, query_regex))
+            {
+                params[matches[1]] = matches[2]; // Associer le nom et la valeur du paramètre de requête
+                query_start = matches.suffix().first;
             }
 
             return params;
@@ -113,4 +131,4 @@ namespace Softadastra
         }
     };
 
-}
+} // namespace Softadastra
