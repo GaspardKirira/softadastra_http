@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <sstream>
 #include "Controller.hpp"
+#include "../kernel/UnifiedRequestHandler.hpp"
 
 namespace Softadastra
 {
@@ -21,61 +22,79 @@ namespace Softadastra
         void configure(Router &routes) override
         {
             routes.add_route(
-                http::verb::post, "/predict",
+                http::verb::get, "/",
                 std::static_pointer_cast<IRequestHandler>(
-                    std::make_shared<DynamicRequestHandler>(
-                        [this](const std::unordered_map<std::string, std::string> &params,
-                               http::response<http::string_body> &res)
+                    std::make_shared<UnifiedRequestHandler>(
+                        [this](const http::request<http::string_body> &req [[maybe_unused]],
+                               http::response<http::string_body> &res [[maybe_unused]])
                         {
-                            handler_predict(params, res);
+                            // Ici, la logique pour gérer la requête GET
+                            Response::success_response(res, "Hello world");
                         })));
-        }
-        void handler_predict(const std::unordered_map<std::string, std::string> &params, http::response<http::string_body> &res)
-        {
-            try
-            {
 
-                json json_data;
-                try
-                {
-                    json_data = json::parse(params.at("body"));
-                }
-                catch (const std::exception &e)
-                {
-                    Response::error_response(res, http::status::bad_request, "Invalid JSON");
-                    return;
-                }
+            routes.add_route(http::verb::post, "/create",
+                             std::static_pointer_cast<IRequestHandler>(
+                                 std::make_shared<UnifiedRequestHandler>(
+                                     [this](const http::request<http::string_body> &req,
+                                            http::response<http::string_body> &res)
+                                     {
+                                         // Vérifie si le corps de la requête n'est pas vide
+                                         if (req.body().empty())
+                                         {
+                                             Response::error_response(res, http::status::bad_request, "Empty request body.");
+                                             return;
+                                         }
 
-                if (json_data.find("revenu") == json_data.end())
-                {
-                    Response::error_response(res, http::status::bad_request, "Le champ 'revenu' est manquant");
-                    return;
-                }
+                                         // Parse le corps de la requête en JSON
+                                         json json_data;
+                                         try
+                                         {
+                                             json_data = json::parse(req.body());
+                                         }
+                                         catch (const std::exception &e)
+                                         {
+                                             // Si l'extraction JSON échoue, renvoyer une erreur
+                                             Response::error_response(res, http::status::bad_request, "Invalid JSON body.");
+                                             return;
+                                         }
 
-                double revenu = json_data["revenu"];
-                double predicted_cost = predict(revenu);
+                                         // À ce stade, json_data contient les données JSON du corps de la requête
+                                         // Tu peux maintenant extraire des valeurs du JSON et les utiliser
+                                         if (json_data.contains("username") && json_data["username"].is_string())
+                                         {
+                                             std::string username = json_data["username"];
+                                             spdlog::info("Received username: {}", username);
+                                         }
+                                         else
+                                         {
+                                             Response::error_response(res, http::status::bad_request, "Missing or invalid 'username' field.");
+                                             return;
+                                         }
 
-                json response_json;
-                response_json["revenu"] = revenu;
-                response_json["predicted_cost"] = predicted_cost;
+                                         if (json_data.contains("email") && json_data["email"].is_string())
+                                         {
+                                             std::string email = json_data["email"];
+                                             spdlog::info("Received email: {}", email);
+                                         }
+                                         else
+                                         {
+                                             Response::error_response(res, http::status::bad_request, "Missing or invalid 'email' field.");
+                                             return;
+                                         }
 
-                Response::json_response(res, response_json);
-            }
-            catch (const json::exception &e)
-            {
-                std::cout << "JSON exception: " << e.what() << std::endl;
-                Response::error_response(res, http::status::bad_request, "Invalid JSON format");
-            }
-            catch (const std::exception &e)
-            {
-                std::cout << "General exception: " << e.what() << std::endl;
-                Response::error_response(res, http::status::internal_server_error, e.what());
-            }
-        }
+                                         // Traite les autres données nécessaires
+                                         // Par exemple, si tu veux enregistrer un nouvel utilisateur dans une base de données ou effectuer d'autres actions.
+                                         Response::success_response(res, "User created successfully");
+                                     })));
 
-        inline double predict(double revenu)
-        {
-            return revenu * 0.3;
+            routes.add_route(http::verb::get, "/users/{id}",
+                             std::static_pointer_cast<IRequestHandler>(
+                                 std::make_shared<UnifiedRequestHandler>(
+                                     [this](const http::request<http::string_body> &req [[maybe_unused]],
+                                            http::response<http::string_body> &res [[maybe_unused]])
+                                     {
+                                         // Cette route peut être implémentée plus tard
+                                     })));
         }
     };
 } // namespace Softadastra

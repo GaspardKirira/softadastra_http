@@ -19,11 +19,11 @@ namespace Softadastra
         auto homeController = std::make_unique<HomeController>(config);
         homeController->configure(router_);
 
-        auto productController = std::make_unique<ProductController>(config);
-        productController->configure(router_);
+        // auto productController = std::make_unique<ProductController>(config);
+        // productController->configure(router_);
 
-        auto userController = std::make_shared<UserController>(config);
-        userController->configure(router_);
+        // auto userController = std::make_shared<UserController>(config);
+        // userController->configure(router_);
     }
 
 }
