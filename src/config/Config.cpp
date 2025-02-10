@@ -62,26 +62,23 @@ void Config::loadConfig()
     }
 }
 
-std::unique_ptr<sql::Connection> Config::getDbConnection()
+std::shared_ptr<sql::Connection> Config::getDbConnection()
 {
     try
     {
-        // Utilisation du driver MySQL directement
         sql::mysql::MySQL_Driver *driver = sql::mysql::get_mysql_driver_instance();
         if (!driver)
         {
             throw std::runtime_error("Impossible de récupérer le driver MySQL.");
         }
 
-        // Création de la connexion
-        std::unique_ptr<sql::Connection> con(
+        std::shared_ptr<sql::Connection> con(
             driver->connect("tcp://" + db_host + ":" + std::to_string(db_port), db_user, db_pass));
         if (!con)
         {
             throw std::runtime_error("La connexion à la base de données a échoué.");
         }
 
-        // Sélection de la base de données
         con->setSchema(getDbName());
         return con;
     }
@@ -97,7 +94,6 @@ std::string Config::getDbPasswordFromEnv()
     if (password == nullptr)
     {
         std::cerr << "Aucun mot de passe DB_PASSWORD trouvé dans les variables d'environnement, utilisation d'un mot de passe par défaut." << std::endl;
-        return "root";
     }
     return std::string(password);
 }

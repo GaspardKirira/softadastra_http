@@ -26,7 +26,7 @@ namespace Softadastra
          *
          * @param router Le routeur qui sera configuré avec les routes.
          */
-        explicit RouteConfigurator(Router &router, Config &config);
+        explicit RouteConfigurator(Router &router);
 
         /**
          * @brief Configure les routes pour le serveur HTTP.
@@ -38,7 +38,6 @@ namespace Softadastra
 
     private:
         Router &router_; /**< Le routeur qui sera utilisé pour ajouter les routes. */
-        Config &config_; /**< Référence à la configuration du serveur. */
     };
 }
 

@@ -20,7 +20,7 @@ namespace Softadastra
           io_context_(std::make_shared<net::io_context>()),
           acceptor_(nullptr),
           router_(),
-          route_configurator_(std::make_unique<RouteConfigurator>(router_, config_)),
+          route_configurator_(std::make_unique<RouteConfigurator>(router_)),
           request_thread_pool_(NUMBER_OF_THREADS),
           io_threads_(),
           ssl_context_(ssl::context::sslv23) // Crée un contexte SSL/TLS
