@@ -8,8 +8,7 @@
 #include <boost/beast.hpp>
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
-#include <boost/asio/signal_set.hpp>
-#include <atomic>
+#include "setup_routes.hpp"
 
 namespace Softadastra
 {
@@ -20,8 +19,7 @@ namespace Softadastra
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)),
           request_thread_pool_(NUMBER_OF_THREADS),
-          io_threads_(),
-          stop_requested_(false)
+          io_threads_()
     {
         try
         {
@@ -73,109 +71,39 @@ namespace Softadastra
         }
     }
 
-    // Ajoutez une méthode pour gérer les signaux
-    void HTTPServer::handle_signals()
-    {
-        boost::asio::signal_set signals(*io_context_, SIGINT, SIGTERM);
-
-        signals.async_wait([this](const boost::system::error_code &ec, int signal_number)
-                           {
-        try
-        {
-            if (!ec)
-            {
-                spdlog::info("Received signal: {}", signal_number == SIGINT ? "SIGINT (Ctrl+C)" : "SIGTERM");
-                stop_requested_ = true; // Drapeau pour arrêter proprement
-                stop(); // Appeler la méthode pour arrêter le serveur et nettoyer les threads
-            }
-            else
-            {
-                spdlog::error("Error while waiting for signal: {}", ec.message());
-            }
-        }
-        catch (const std::exception &e)
-        {
-            spdlog::error("Exception caught in async_wait signal handler: {}", e.what());
-        } });
-    }
-
-    // Ajouter la méthode stop() pour arrêter le serveur proprement
-    void HTTPServer::stop()
-    {
-        spdlog::info("Stopping the server...");
-
-        // Fermer le socket de l'acceptor
-        acceptor_->close();
-
-        // Joindre tous les threads avant de quitter
-        for (auto &t : io_threads_)
-        {
-            if (t.joinable())
-            {
-                t.join();
-                spdlog::info("Thread {} has finished.", &t - &io_threads_[0]); // Log lorsque le thread se termine
-            }
-        }
-
-        spdlog::info("All threads are closed.");
-    }
-
     void HTTPServer::run()
     {
         try
         {
-            router_.add_route(
-                http::verb::get, "/",
-                std::static_pointer_cast<IRequestHandler>(
-                    std::make_shared<SimpleRequestHandler>(
-                        [this](const http::request<http::string_body> &,
-                               http::response<http::string_body> &res)
-                        {
-                            Response::success_response(res, "Hello world");
-                        })));
-
-            // Démarrer le gestionnaire de signaux
-            handle_signals();
+            route_configurator_->configure_routes();
 
             spdlog::info("Softadastra/master server is running at http://127.0.0.1:{} using {} threads", config_.getServerPort(), NUMBER_OF_THREADS);
             spdlog::info("Waiting for incoming connections...");
 
+            // Démarrer l'acceptation des connexions (avant de lancer les threads)
             start_accept();
 
-            // Lancer les threads de l'io_context
             for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
             {
                 io_threads_.emplace_back([this, i]()
                                          {
-                                             try
-                                             {
-                                                 io_context_->run();
-                                             }
-                                             catch (const std::exception &e)
-                                             {
-                                                 spdlog::error("Error in io_context (thread {}): {}", i, e.what());
-                                             }
-                                             spdlog::info("Thread {} finished.", i); // Log pour chaque thread qui termine
-                                         });
+                    try
+                    {
+                        io_context_->run();
+                    }
+                    catch (const std::exception &e)
+                    {
+                        spdlog::error("Error in io_context (thread {}): {}", i, e.what());
+                    }
+                    spdlog::info("Thread {} finished.", i); });
             }
 
-            // Attendre que le signal soit reçu avant de fermer l'io_context
-            while (!stop_requested_)
+            // Attendre que tous les threads aient terminé
+            for (auto &t : io_threads_)
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Attente active
-                if (io_context_->stopped())                                  // Vérifier si le contexte IO a été arrêté de manière imprévue
-                {
-                    spdlog::warn("IO Context stopped unexpectedly");
-                    break;
-                }
+                if (t.joinable())
+                    t.join();
             }
-
-            spdlog::info("Stop requested. Shutting down...");
-
-            // Une fois le signal capté, arrêter l'io_context et arrêter le serveur
-            io_context_->stop();
-            stop(); // Arrêter et nettoyer les threads
-
             spdlog::info("All io_context threads finished.");
         }
         catch (const std::exception &e)
