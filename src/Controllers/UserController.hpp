@@ -11,53 +11,16 @@
 #include <nlohmann/json.hpp>
 #include <sstream>
 #include "../kernel/Response.hpp"
+#include "User.hpp"
 
 namespace Softadastra
 {
-
-    class User
-    {
-    public:
-        User() : id_(), full_name_(), email_() {}
-
-        const int &getId() const { return id_; }
-        const std::string &getName() const { return full_name_; }
-        const std::string &getEmail() const { return email_; }
-
-        void setId(int id)
-        {
-            id_ = id;
-        }
-
-        void setFullName(const std::string &name)
-        {
-            full_name_ = name;
-        }
-
-        void setEmail(const std::string &userEmail)
-        {
-            email_ = userEmail;
-        }
-        nlohmann::json to_json() const
-        {
-            return nlohmann::json{
-                {"id", id_},
-                {"full_name", full_name_},
-                {"email", email_}};
-        }
-
-    private:
-        int id_;
-        std::string full_name_;
-        std::string email_;
-    };
-
     class UserController : public Controller
     {
     public:
         using Controller::Controller;
 
-        void configure(Router &router)
+        void configure(Router &router) override
         {
             auto self = std::shared_ptr<UserController>(this, [](UserController *) {});
 
@@ -211,8 +174,8 @@ namespace Softadastra
                                      })));
         }
 
-    private:
-        std::unique_ptr<sql::Connection> getDbConnection()
+    public:
+        std::shared_ptr<sql::Connection> getDbConnection()
         {
             try
             {
@@ -230,7 +193,7 @@ namespace Softadastra
         {
             try
             {
-                std::unique_ptr<sql::Connection> con = getDbConnection();
+                std::shared_ptr<sql::Connection> con = getDbConnection();
                 if (!con)
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");
@@ -269,7 +232,7 @@ namespace Softadastra
             try
             {
                 // Se connecter à la base de données
-                std::unique_ptr<sql::Connection> con = getDbConnection();
+                std::shared_ptr<sql::Connection> con = getDbConnection();
                 if (!con)
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");
@@ -315,7 +278,7 @@ namespace Softadastra
         {
             try
             {
-                std::unique_ptr<sql::Connection> con = getDbConnection();
+                auto con = getDbConnection();
                 if (!con)
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");
@@ -351,7 +314,7 @@ namespace Softadastra
 
             try
             {
-                std::unique_ptr<sql::Connection> con = getDbConnection();
+                std::shared_ptr<sql::Connection> con = getDbConnection();
                 if (!con)
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");

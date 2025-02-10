@@ -6,8 +6,8 @@
 
 namespace Softadastra
 {
-    RouteConfigurator::RouteConfigurator(Router &router, Config &config)
-        : router_(router), config_(config)
+    RouteConfigurator::RouteConfigurator(Router &router)
+        : router_(router)
     {
     }
 

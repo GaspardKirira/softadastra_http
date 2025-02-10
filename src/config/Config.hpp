@@ -63,7 +63,7 @@ public:
      * @return Une connexion MySQL valide.
      * @throws std::runtime_error Si la connexion échoue.
      */
-    std::unique_ptr<sql::Connection> getDbConnection();
+    std::shared_ptr<sql::Connection > getDbConnection();
 
     /**
      * @brief Récupère le mot de passe de la base de données depuis les variables d'environnement.
