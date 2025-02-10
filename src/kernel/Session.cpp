@@ -7,37 +7,25 @@
 namespace Softadastra
 {
 
-    // Constructeur modifié pour accepter un ssl_socket
-    Session::Session(ssl_socket socket, Router &router)
+    // Constructeur modifié pour accepter un tcp::socket
+    Session::Session(tcp::socket socket, Router &router)
         : socket_(std::move(socket)), router_(router), buffer_(8060), req_()
     {
-        spdlog::info("Session initialized for client: {}", socket_.lowest_layer().remote_endpoint().address().to_string());
+        spdlog::info("Session initialized for client: {}", socket_.remote_endpoint().address().to_string());
     }
 
     void Session::run()
     {
         auto self = shared_from_this();
 
-        // SSL Handshake
-        socket_.async_handshake(boost::asio::ssl::stream_base::server,
-                                [this, self](boost::system::error_code ec)
-                                {
-                                    if (ec)
-                                    {
-                                        spdlog::error("SSL handshake failed: {}", ec.message());
-                                        close_socket();
-                                        return;
-                                    }
-
-                                    spdlog::info("SSL handshake successful.");
-                                    read_request();
-                                });
+        // Suppression du SSL handshake, car nous utilisons une connexion non sécurisée
+        read_request();
     }
 
     void Session::read_request()
     {
         // Vérification si le socket est ouvert
-        if (!socket_.lowest_layer().is_open())
+        if (!socket_.is_open())
         {
             spdlog::error("Socket is not open, cannot read request!");
             return;
@@ -74,7 +62,7 @@ namespace Softadastra
 
                                            if (ec)
                                            {
-                                               spdlog::error("Error during async_read: {} (SSL error: {})", ec.message(), ec.value());
+                                               spdlog::error("Error during async_read: {}", ec.message());
                                                close_socket();
                                                return;
                                            }
@@ -138,8 +126,8 @@ namespace Softadastra
 
     void Session::send_response(boost::beast::http::response<boost::beast::http::string_body> &res)
     {
-        // Vérification si le socket est ouvert (en utilisant lowest_layer)
-        if (!socket_.lowest_layer().is_open())
+        // Vérification si le socket est ouvert
+        if (!socket_.is_open())
         {
             spdlog::error("Socket is not open, cannot send response!");
             return;
@@ -153,12 +141,12 @@ namespace Softadastra
                                         {
                                             if (ec)
                                             {
-                                                spdlog::error("Error sending response: {} (SSL error: {})", ec.message(), ec.value());
+                                                spdlog::error("Error sending response: {}", ec.message());
                                                 return;
                                             }
                                             spdlog::info("Response sent successfully.");
-                                            socket_.lowest_layer().shutdown(tcp::socket::shutdown_both);
-                                            socket_.lowest_layer().close();
+                                            socket_.shutdown(tcp::socket::shutdown_both);
+                                            socket_.close();
                                         });
     }
 
@@ -173,10 +161,10 @@ namespace Softadastra
     void Session::close_socket()
     {
         boost::system::error_code ignored_ec;
-        // Vérification si le socket est ouvert (en utilisant lowest_layer)
-        if (socket_.lowest_layer().is_open())
+        // Vérification si le socket est ouvert
+        if (socket_.is_open())
         {
-            socket_.lowest_layer().close(ignored_ec);
+            socket_.close(ignored_ec);
             spdlog::info("Socket closed.");
         }
         else
