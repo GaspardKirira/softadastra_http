@@ -7,7 +7,7 @@
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include <memory>
-#include "Router.hpp"
+#include "routing/Router.hpp"
 
 namespace Softadastra
 {
@@ -36,7 +36,9 @@ namespace Softadastra
          * @param socket The TCP socket representing the client connection.
          * @param router A reference to the Router that will handle request routing.
          */
-        explicit Session(tcp::socket socket, Softadastra::Router &router); ///< Accepter un tcp::socket
+        explicit Session(tcp::socket socket, Softadastra::Router &router);
+
+        ~Session();
 
         /**
          * @brief Starts the session by initiating the request reading process.

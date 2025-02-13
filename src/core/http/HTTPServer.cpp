@@ -1,4 +1,4 @@
-#include "ThreadPool.hpp"
+#include "threading/ThreadPool.hpp"
 #include "HTTPServer.hpp"
 #include <memory>
 #include <thread>
@@ -8,7 +8,6 @@
 #include <boost/beast.hpp>
 #include <spdlog/spdlog.h>
 #include <boost/filesystem.hpp>
-#include "setup_routes.hpp"
 
 namespace Softadastra
 {
@@ -69,6 +68,11 @@ namespace Softadastra
             spdlog::error("Error initializing server: {}", e.what());
             throw;
         }
+    }
+
+    HTTPServer::~HTTPServer()
+    {
+        std::cout << "HTTPServer: Destroyed" << std::endl;
     }
 
     void HTTPServer::run()

@@ -1,9 +1,9 @@
 #ifndef IROUTES_HPP
 #define IROUTES_HPP
 
-#include "../kernel/Router.hpp"
-#include "../config/Config.hpp"
-#include "../kernel/Response.hpp"
+#include "routing/Router.hpp"
+#include "config/Config.hpp"
+#include "http/Response.hpp"
 
 namespace Softadastra
 {

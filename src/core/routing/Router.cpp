@@ -1,10 +1,15 @@
 #include "DynamicRequestHandler.hpp"
 #include "Router.hpp"
-#include "Response.hpp"
+#include "http/Response.hpp"
 #include <regex>
 
 namespace Softadastra
 {
+    Router::~Router()
+    {
+        std::cout << "Router: Destroyed" << std::endl;
+    }
+
     void Router::add_route(http::verb method, const std::string &route, std::shared_ptr<IRequestHandler> handler)
     {
         // Ajouter la route au routeur
