@@ -18,6 +18,19 @@ else()
     message(FATAL_ERROR "Boost not found!")
 endif()
 
+# Ajouter les répertoires d'inclusion du projet
+include_directories(
+    ${CMAKE_SOURCE_DIR}/src  # Permet d'écrire #include "core/http/Response.hpp"
+    ${CMAKE_SOURCE_DIR}/src/core
+    ${CMAKE_SOURCE_DIR}/src/core/http
+    ${CMAKE_SOURCE_DIR}/src/core/routing
+    ${CMAKE_SOURCE_DIR}/src/core/session
+    ${CMAKE_SOURCE_DIR}/src/core/threading
+    ${CMAKE_SOURCE_DIR}/src/config
+    ${CMAKE_SOURCE_DIR}/src/controllers
+    ${CMAKE_SOURCE_DIR}/src/utils
+)
+
 # Ajouter les répertoires d'inclusion de MySQL Connector/C++
 include_directories(/usr/include/mysql)
 
@@ -36,12 +49,8 @@ find_package(OpenSSL REQUIRED)
 # Ajouter le répertoire d'inclusion de OpenSSL
 include_directories(${OPENSSL_INCLUDE_DIR})
 
-# Ajouter le répertoire src/config où se trouvent Config.hpp et Config.cpp
-include_directories(${CMAKE_SOURCE_DIR}/src/config)
-
-# Ajouter tous les fichiers .cpp dans src et src/config
-# Assure-toi que Config.cpp est bien inclus
-file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/config/*.cpp src/config/RouteConfigurator.cpp)
+# Récupérer tous les fichiers .cpp dans src et ses sous-dossiers
+file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/config/*.cpp src/core/**/*.cpp)
 
 # Ajouter l'exécutable et spécifier les fichiers sources
 add_executable(prog ${SOURCE_FILES})

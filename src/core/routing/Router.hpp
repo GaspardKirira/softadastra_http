@@ -15,7 +15,7 @@
 #include <string>
 #include <spdlog/spdlog.h>
 #include "IRequestHandler.hpp"
-#include "Config.hpp"
+#include "config/Config.hpp"
 
 namespace Softadastra
 {
@@ -73,6 +73,8 @@ namespace Softadastra
          * Ce constructeur initialise une table de routage vide, prête à accepter des routes.
          */
         Router() : routes_(), route_patterns_() {}
+
+        ~Router();
 
         /**
          * @brief Ajoute une nouvelle route au routeur.

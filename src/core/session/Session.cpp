@@ -1,5 +1,5 @@
 #include "Session.hpp"
-#include "Response.hpp"
+#include "http/Response.hpp"
 #include <boost/beast/http.hpp>
 #include <boost/beast/core.hpp>
 #include <spdlog/spdlog.h>
@@ -12,6 +12,11 @@ namespace Softadastra
         : socket_(std::move(socket)), router_(router), buffer_(8060), req_()
     {
         spdlog::info("Session initialized for client: {}", socket_.remote_endpoint().address().to_string());
+    }
+
+    Session::~Session()
+    {
+        std::cout << "Session: Destroyed" << std::endl;
     }
 
     void Session::run()

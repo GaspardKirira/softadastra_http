@@ -2,7 +2,7 @@
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include <regex>
-#include "Response.hpp"
+#include "http/Response.hpp"
 
 using json = nlohmann::json;
 namespace Softadastra
@@ -13,6 +13,8 @@ namespace Softadastra
         UnifiedRequestHandler(
             std::function<void(const http::request<http::string_body> &, http::response<http::string_body> &)> handler)
             : handler_(std::move(handler)) {}
+
+        ~UnifiedRequestHandler() {}
 
         void handle_request(const http::request<http::string_body> &req, http::response<http::string_body> &res) override
         {

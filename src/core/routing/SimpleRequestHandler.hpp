@@ -23,6 +23,8 @@ namespace Softadastra
          */
         explicit SimpleRequestHandler(std::function<void(const http::request<http::string_body> &, http::response<http::string_body> &)> handler);
 
+        ~SimpleRequestHandler() {}
+
         /**
          * @brief Gère une requête HTTP en exécutant la fonction personnalisée fournie.
          *

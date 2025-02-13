@@ -2,7 +2,7 @@
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
 #include <regex>
-#include "Response.hpp"
+#include "http/Response.hpp"
 
 using json = nlohmann::json;
 
@@ -15,6 +15,11 @@ namespace Softadastra
             handler)
         : params_(), handler_(std::move(handler))
     {
+    }
+
+    DynamicRequestHandler::~DynamicRequestHandler()
+    {
+        std::cout << "DynamicRequestHandler: Destroyed" << std::endl;
     }
 
     void DynamicRequestHandler::handle_request(const http::request<http::string_body> &req,

@@ -19,11 +19,11 @@
 #include "SimpleRequestHandler.hpp"
 #include "IRequestHandler.hpp"
 #include "DynamicRequestHandler.hpp"
-#include "../config/Config.hpp"
-#include "Router.hpp"
-#include "Session.hpp"
+#include "config/Config.hpp"
+#include "routing/Router.hpp"
+#include "session/Session.hpp"
 #include "Response.hpp"
-#include "../config/RouteConfigurator.hpp"
+#include "config/RouteConfigurator.hpp"
 #include "ThreadPool.hpp"
 
 namespace Softadastra
@@ -55,6 +55,7 @@ namespace Softadastra
          * @param config The configuration object that contains server settings (e.g., port, routes).
          */
         explicit HTTPServer(Config &config);
+        ~HTTPServer();
 
         void handle_signals();
 

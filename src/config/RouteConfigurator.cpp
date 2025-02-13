@@ -1,7 +1,7 @@
 #include "RouteConfigurator.hpp"
-#include "../Controllers/ProductController.hpp"
-#include "../Controllers/UserController.hpp"
-#include "../Controllers/HomeController.hpp"
+#include "Controllers/ProductController.hpp"
+#include "Controllers/UserController.hpp"
+#include "Controllers/HomeController.hpp"
 #include <memory>
 
 namespace Softadastra

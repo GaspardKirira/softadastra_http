@@ -10,7 +10,7 @@
 #include <unordered_set>
 #include <sstream>
 #include "Controller.hpp"
-#include "../kernel/UnifiedRequestHandler.hpp"
+#include "routing/UnifiedRequestHandler.hpp"
 
 namespace Softadastra
 {

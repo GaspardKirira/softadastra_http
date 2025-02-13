@@ -26,8 +26,13 @@ public:
     virtual void handle_request(const http::request<http::string_body> &req,
                                 http::response<http::string_body> &res) = 0;
 
+    IRequestHandler() = default;
+
     // Destructeur virtuel pour permettre la gestion correcte des objets dérivés.
     virtual ~IRequestHandler() = default;
+
+    IRequestHandler(const IRequestHandler &) = delete;
+    void operator=(const IRequestHandler &) = delete;
 };
 
 #endif // IREQUESTHANDLER_HPP

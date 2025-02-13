@@ -1,5 +1,5 @@
 #include "config/Config.hpp"
-#include "kernel/HTTPServer.hpp"
+#include "http/HTTPServer.hpp"
 
 /**
  * @brief Point d'entrée du programme.

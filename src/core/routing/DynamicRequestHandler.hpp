@@ -27,6 +27,8 @@ namespace Softadastra
         explicit DynamicRequestHandler(std::function<void(const std::unordered_map<std::string, std::string> &,
                                                           http::response<http::string_body> &)>
                                            handler);
+            ~DynamicRequestHandler();
+
 
         /**
          * @brief Implémente la méthode handle_request de IRequestHandler.
