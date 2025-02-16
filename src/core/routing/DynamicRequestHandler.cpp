@@ -38,8 +38,43 @@ namespace Softadastra
                 spdlog::info("Parameter 'id' found: {}", id_it->second);
             }
 
-            // Traiter la requête
+            // Traiter la requête GET
             handler_(params_, res);
+        }
+        else if (req.method() == http::verb::put)
+        {
+            // Log de la méthode PUT
+            spdlog::info("Handling PUT request for path: {}", req.target());
+
+            // Vérifier si le corps de la requête est vide
+            const std::string &body = req.body();
+            if (body.empty())
+            {
+                Response::error_response(res, http::status::bad_request, "Empty request body.");
+                return;
+            }
+
+            // Tenter de parser le JSON du corps
+            json request_json;
+            try
+            {
+                request_json = json::parse(body);
+            }
+            catch (const std::exception &e)
+            {
+                Response::error_response(res, http::status::bad_request, "Invalid JSON body.");
+                return;
+            }
+
+            // Traitement spécifique pour les requêtes PUT
+            if (params_.find("body") != params_.end())
+            {
+                handler_({{"body", body}}, res);
+            }
+            else
+            {
+                Response::error_response(res, http::status::bad_request, "Missing 'body' parameter.");
+            }
         }
         else
         {

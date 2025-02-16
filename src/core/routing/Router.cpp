@@ -43,12 +43,12 @@ namespace Softadastra
             return true;
         }
 
-        // Vérifier si la méthode HTTP est valide (si elle est dans la liste des méthodes autorisées)
+        // Vérifier si la méthode HTTP est valide
         if (req.method() != http::verb::get && req.method() != http::verb::post && req.method() != http::verb::put &&
             req.method() != http::verb::delete_ && req.method() != http::verb::patch && req.method() != http::verb::head)
         {
             spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
-            res.result(http::status::method_not_allowed); // Code 405 pour méthode non autorisée
+            res.result(http::status::method_not_allowed);
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", "Method Not Allowed"}}.dump();
             return false; // Retourner immédiatement après avoir géré l'erreur
@@ -84,7 +84,6 @@ namespace Softadastra
             }
         }
 
-        // Si une route dynamique a été trouvée, la traiter
         if (matched)
         {
             return true;
@@ -94,31 +93,35 @@ namespace Softadastra
         if (route_exists && !method_allowed)
         {
             spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
-            res.result(http::status::method_not_allowed); // Code 405 pour méthode non autorisée
+            res.result(http::status::method_not_allowed);
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", "Method Not Allowed"}}.dump();
-            return false; // Retourner immédiatement après avoir géré l'erreur
+            return false;
         }
 
         // Si aucune route ne correspond, retourner "Route not found"
         spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
-        res.result(http::status::not_found); // Code 404 pour route non trouvée
+        res.result(http::status::not_found);
         res.set(http::field::content_type, "application/json");
-        res.body() = json{{"message", "Route not found"}}.dump(); // Message pour "Route not found"
-        return false;                                             // Retourner immédiatement après avoir géré l'erreur
+        res.body() = json{{"message", "Route not found"}}.dump();
+        return false;
     }
 
     bool Router::matches_dynamic_route(const std::string &route_pattern, const std::string &path,
                                        std::shared_ptr<IRequestHandler> handler, http::response<http::string_body> &res,
                                        const http::request<http::string_body> &req)
     {
-        boost::regex dynamic_route(convert_route_to_regex(route_pattern));
+        std::string regex_pattern = convert_route_to_regex(route_pattern);
+        spdlog::info("Checking if path '{}' matches pattern '{}'", path, regex_pattern);
+        boost::regex dynamic_route(regex_pattern);
         boost::smatch match;
 
         if (boost::regex_match(path, match, dynamic_route))
         {
             std::unordered_map<std::string, std::string> params;
-            size_t param_count = 0;
+            spdlog::info("Extracted parameters:");
+
+            size_t param_count = 1; // Commence à 1 pour éviter le premier groupe (qui est l'URL entière)
 
             // Extraire les paramètres dynamiques
             for (size_t start = 0; (start = route_pattern.find('{', start)) != std::string::npos;)
@@ -127,22 +130,26 @@ namespace Softadastra
                 if (end != std::string::npos)
                 {
                     std::string param_name = route_pattern.substr(start + 1, end - start - 1);
-                    if (param_count < match.size() - 1)
+                    if (param_count < match.size())
                     {
-                        params[param_name] = match[param_count + 1].str();
+                        params[param_name] = match[param_count].str();
                         param_count++;
+                        spdlog::info("Extracted parameter: {} = {}", param_name, params[param_name]);
                     }
                     start = end + 1;
                 }
             }
 
-            spdlog::info("Extracted parameters: {}", map_to_string(params));
+            // Validation des paramètres extraits
+            if (!validate_parameters(params, res))
+            {
+                return false;
+            }
 
-            // Assurez-vous que le gestionnaire est bien de type DynamicRequestHandler
+            // Assurez-vous que le gestionnaire peut gérer les paramètres extraits
             auto dynamic_handler = std::dynamic_pointer_cast<DynamicRequestHandler>(handler);
             if (dynamic_handler)
             {
-                // Passer les paramètres extraits au gestionnaire
                 dynamic_handler->set_params(params, res);
                 if (res.result() != http::status::ok)
                 {
