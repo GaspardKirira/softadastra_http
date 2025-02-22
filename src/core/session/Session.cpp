@@ -23,7 +23,7 @@ namespace Softadastra
     {
         auto self = shared_from_this();
 
-        // Suppression du SSL handshake, car nous utilisons une connexion non sécurisée
+        // Suppression du SSL handshake, car nous utilisons une connexion non sécurisée aujourd'hui
         read_request();
     }
 
@@ -137,10 +137,8 @@ namespace Softadastra
             spdlog::error("Socket is not open, cannot send response!");
             return;
         }
-
         auto self = shared_from_this();
         auto res_ptr = std::make_shared<boost::beast::http::response<boost::beast::http::string_body>>(std::move(res));
-
         boost::beast::http::async_write(socket_, *res_ptr,
                                         [this, self, res_ptr](boost::system::error_code ec, std::size_t)
                                         {
