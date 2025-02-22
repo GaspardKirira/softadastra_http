@@ -53,6 +53,7 @@ public:
      * @throws std::runtime_error Si le fichier ne peut être ouvert ou si le parsing échoue.
      */
     void loadConfig();
+    void loadConfigOnce();
 
     /**
      * @brief Obtient une connexion à la base de données MySQL.
@@ -63,7 +64,7 @@ public:
      * @return Une connexion MySQL valide.
      * @throws std::runtime_error Si la connexion échoue.
      */
-    std::shared_ptr<sql::Connection > getDbConnection();
+    std::shared_ptr<sql::Connection> getDbConnection();
 
     /**
      * @brief Récupère le mot de passe de la base de données depuis les variables d'environnement.

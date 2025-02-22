@@ -17,7 +17,8 @@ namespace Softadastra
           acceptor_(nullptr),
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)),
-          request_thread_pool_(NUMBER_OF_THREADS),
+          // Initialisation correcte du ThreadPool avec tous les paramètres requis
+          request_thread_pool_(NUMBER_OF_THREADS, 100, 20, std::chrono::milliseconds(1000)), // max_queue_size = 100, max_dynamic_threads = 20, timeout = 1000ms
           io_threads_()
     {
         try
@@ -72,7 +73,8 @@ namespace Softadastra
 
     HTTPServer::~HTTPServer()
     {
-        std::cout << "HTTPServer: Destroyed" << std::endl;
+        // Réduction des logs dans le destructeur
+        // std::cout << "HTTPServer: Destroyed" << std::endl; // Suppression de l'info sur la destruction
     }
 
     void HTTPServer::run()
@@ -101,7 +103,6 @@ namespace Softadastra
                     }
                     spdlog::info("Thread {} finished.", i); });
             }
-
             // Attendre que tous les threads aient terminé
             for (auto &t : io_threads_)
             {
@@ -126,18 +127,26 @@ namespace Softadastra
                                     {
                                         if (!ec)
                                         {
-                                            spdlog::info("Client connected from: {}", socket->remote_endpoint().address().to_string());
+                                            // Log réduit sur l'acceptation de connexion
+                                            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
+                                            auto now = std::chrono::steady_clock::now();
+                                            if (now - last_log_time > std::chrono::seconds(10))
+                                            {
+                                                spdlog::info("Client connected from: {}", socket->remote_endpoint().address().to_string());
+                                                last_log_time = now;
+                                            }
+
                                             request_thread_pool_.enqueue([this, socket]()
                                                                          {
-                                                             try
-                                                             {
-                                                                 handle_client(socket, router_);
-                                                             }
-                                                             catch (const std::exception &e)
-                                                             {
-                                                                 spdlog::error("Error handling client: {}", e.what());
-                                                                 close_socket(socket);
-                                                             } });
+                                                try
+                                                {
+                                                    handle_client(socket, router_);
+                                                }
+                                                catch (const std::exception &e)
+                                                {
+                                                    spdlog::error("Error handling client: {}", e.what());
+                                                    close_socket(socket);
+                                                } });
                                         }
                                         else
                                         {
@@ -181,7 +190,15 @@ namespace Softadastra
         {
             spdlog::error("Error in client session for client {}: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
             socket_ptr->close(); // Attempt to close the socket if error occurs
-            spdlog::error("Session handler failed for client {} with exception: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
+            // Log réduit sur l'échec de la session
+            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_log_time > std::chrono::seconds(10))
+            {
+                spdlog::error("Session handler failed for client {} with exception: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
+                last_log_time = now;
+            }
         }
     }
+
 } // namespace Softadastra
