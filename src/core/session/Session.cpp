@@ -16,7 +16,8 @@ namespace Softadastra
 
     Session::~Session()
     {
-        std::cout << "Session: Destroyed" << std::endl;
+        // Réduit la verbosité des destructions
+        // std::cout << "Session: Destroyed" << std::endl;  // Plus de log sur la destruction
     }
 
     void Session::run()
@@ -29,7 +30,7 @@ namespace Softadastra
 
     void Session::read_request()
     {
-        // Vérification si le socket est ouvert
+        // Vérifie si le socket est ouvert avant de procéder
         if (!socket_.is_open())
         {
             spdlog::error("Socket is not open, cannot read request!");
@@ -37,55 +38,53 @@ namespace Softadastra
         }
 
         auto self = shared_from_this();
-        buffer_.consume(buffer_.size());
+        buffer_.consume(buffer_.size()); // Vide le buffer avant la nouvelle lecture
 
-        // Timer pour les délais de requêtes
+        // Crée un timer de 5 secondes pour éviter les délais trop longs
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
         timer->expires_after(std::chrono::seconds(5));
 
         std::weak_ptr<boost::asio::steady_timer> weak_timer = timer;
         timer->async_wait([this, self, weak_timer](boost::system::error_code ec)
                           {
-                              auto timer = weak_timer.lock();
-                              if (!timer)
-                              {
-                                  spdlog::info("Timer is no longer available.");
-                                  return;
-                              }
+            auto timer = weak_timer.lock();
+            if (!timer)
+            {
+                spdlog::info("Timer is no longer available.");
+                return;
+            }
+    
+            if (!ec)
+            {
+                spdlog::warn("Timeout: No request received after 5 seconds!");
+                close_socket();
+            } });
 
-                              if (!ec)
-                              {
-                                  spdlog::warn("Timeout: No request received after 5 seconds!");
-                                  close_socket();
-                              } });
-
-        // Lecture de la requête
+        // Démarre la lecture asynchrone de la requête
         boost::beast::http::async_read(socket_, buffer_, req_,
                                        [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
                                        {
-                                           timer->cancel();
+                                           timer->cancel(); // Annule le timer si la lecture s'est terminée avant le délai
 
                                            if (ec)
                                            {
-                                               spdlog::error("Error during async_read: {}", ec.message());
-                                               close_socket();
+                                               // Vérifie si l'erreur est une fermeture propre de la connexion (EOF)
+                                               if (ec == boost::asio::error::eof)
+                                               {
+                                                   spdlog::info("Connection closed cleanly by peer.");
+                                               }
+                                               else if (ec != boost::asio::error::operation_aborted)
+                                               {
+                                                   spdlog::error("Error during async_read: {}", ec.message());
+                                               }
+                                               close_socket(); // Ferme le socket si une erreur se produit
                                                return;
                                            }
 
+                                           // Log détaillé pour la réussite de la lecture
                                            spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
 
-                                           // Vérification WAF avant de traiter la requête
-                                           if (!waf_check_request(req_))
-                                           {
-                                               spdlog::warn("Suspicious request blocked.");
-                                               send_error("Forbidden: Suspicious request");
-                                               return;
-                                           }
-
-                                           spdlog::info("Method: {}", req_.method_string());
-                                           spdlog::info("Target: {}", req_.target());
-                                           spdlog::info("Body: {}", req_.body());
-
+                                           // Passe à la gestion de la requête
                                            handle_request(ec);
                                        });
     }
@@ -98,7 +97,7 @@ namespace Softadastra
             return;
         }
 
-        // Vérification de la taille de la requête
+        // Checking request body size, and enforce limits like payload size.
         if (req_.body().size() > MAX_REQUEST_SIZE)
         {
             spdlog::warn("Request too large: {} bytes", req_.body().size());
@@ -131,23 +130,35 @@ namespace Softadastra
 
     void Session::send_response(boost::beast::http::response<boost::beast::http::string_body> &res)
     {
-        // Vérification si le socket est ouvert
         if (!socket_.is_open())
         {
             spdlog::error("Socket is not open, cannot send response!");
             return;
         }
+
         auto self = shared_from_this();
         auto res_ptr = std::make_shared<boost::beast::http::response<boost::beast::http::string_body>>(std::move(res));
+
         boost::beast::http::async_write(socket_, *res_ptr,
                                         [this, self, res_ptr](boost::system::error_code ec, std::size_t)
                                         {
                                             if (ec)
                                             {
                                                 spdlog::error("Error sending response: {}", ec.message());
+                                                // Ici tu peux décider de fermer le socket en cas d'erreur d'écriture
+                                                close_socket();
                                                 return;
                                             }
-                                            spdlog::info("Response sent successfully.");
+
+                                            // Limiter la fréquence des logs pour les réponses envoyées
+                                            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
+                                            auto now = std::chrono::steady_clock::now();
+                                            if (now - last_log_time > std::chrono::seconds(10))
+                                            {
+                                                spdlog::info("Response sent successfully.");
+                                                last_log_time = now;
+                                            }
+
                                             socket_.shutdown(tcp::socket::shutdown_both);
                                             socket_.close();
                                         });
@@ -164,47 +175,61 @@ namespace Softadastra
     void Session::close_socket()
     {
         boost::system::error_code ignored_ec;
-        // Vérification si le socket est ouvert
         if (socket_.is_open())
         {
             socket_.close(ignored_ec);
-            spdlog::info("Socket closed.");
+            if (ignored_ec)
+            {
+                // Réduit les logs sur la fermeture du socket
+                spdlog::warn("Error closing socket: {}", ignored_ec.message());
+            }
+            else
+            {
+                spdlog::info("Socket closed.");
+            }
         }
         else
         {
-            spdlog::error("Socket already closed or not open.");
+            spdlog::warn("Socket already closed or not open.");
         }
     }
 
     bool Session::waf_check_request(const boost::beast::http::request<boost::beast::http::string_body> &req)
     {
-        // Exemple simple de détection XSS
+        // Détection d'une attaque XSS
         if (req.target().find("<script>") != std::string::npos)
         {
             spdlog::warn("Possible XSS attack detected in URL: {}", req.target());
             return false;
         }
 
-        // Vérification d'une injection SQL basique
+        // Détection d'une injection SQL simple
         if (req.body().find("SELECT * FROM") != std::string::npos)
         {
             spdlog::warn("Possible SQL injection detected in body: {}", req.body());
             return false;
         }
 
-        // Limitation de la taille des en-têtes et du corps
+        // Vérification de la taille du corps de la requête
         if (req.body().size() > MAX_REQUEST_BODY_SIZE)
         {
             spdlog::warn("Request body too large: {} bytes", req.body().size());
             return false;
         }
 
-        // Exemple de détection d'un User-Agent suspect
+        // Détection d'un User-Agent suspect
         if (req.find("User-Agent") != req.end() &&
             req["User-Agent"].find("curl") != std::string::npos &&
-            req["User-Agent"].find("8.5.0") == std::string::npos) // Ne bloque pas curl/8.5.0
+            req["User-Agent"].find("8.5.0") == std::string::npos) // Exclure certaines versions de curl
         {
             spdlog::warn("Suspicious User-Agent detected: {}", req["User-Agent"]);
+            return false;
+        }
+
+        // Vérification de la présence de certains en-têtes suspects (par exemple, Origin ou Referer)
+        if (req.find("Origin") != req.end() || req.find("Referer") != req.end())
+        {
+            spdlog::warn("Suspicious Origin or Referer headers detected.");
             return false;
         }
 

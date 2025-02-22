@@ -98,6 +98,16 @@ std::string Config::getDbPasswordFromEnv()
     return std::string(password);
 }
 
+void Config::loadConfigOnce()
+{
+    static bool config_loaded = false;
+    if (!config_loaded)
+    {
+        loadConfig();
+        config_loaded = true;
+    }
+}
+
 const std::string &Config::getDbHost() const { return db_host; }
 const std::string &Config::getDbUser() const { return db_user; }
 const std::string &Config::getDbName() const { return db_name; }

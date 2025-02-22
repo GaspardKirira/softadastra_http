@@ -175,18 +175,56 @@ namespace Softadastra
         }
 
     public:
+        // 2. Vérification explicite de la validité de la connexion
         std::shared_ptr<sql::Connection> getDbConnection()
         {
             try
             {
                 Config &config = Config::getInstance();
-                config.loadConfig();
+                config.loadConfigOnce(); // Charger la config une seule fois
                 return config.getDbConnection();
             }
             catch (const std::exception &e)
             {
                 throw std::runtime_error("Erreur de connexion à la base de données.");
             }
+        }
+
+        // 3. Vérification de la validité avant l'utilisation
+        std::vector<User> findAll()
+        {
+            std::vector<User> users;
+
+            try
+            {
+                std::shared_ptr<sql::Connection> con = getDbConnection();
+                if (!con || !con->isValid()) // Vérification explicite de la validité
+                {
+                    throw std::runtime_error("La connexion à la base de données a échoué.");
+                }
+
+                std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM test_user"));
+                std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery());
+
+                while (res->next())
+                {
+                    User user;
+                    user.setId(res->getInt("id"));
+                    user.setFullName(res->getString("full_name"));
+                    user.setEmail(res->getString("email"));
+                    users.push_back(user);
+                }
+            }
+            catch (const sql::SQLException &e)
+            {
+                throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
+            }
+            catch (const std::exception &e)
+            {
+                throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
+            }
+
+            return users;
         }
 
         User createUser(const std::string &full_name, const std::string &email)
@@ -306,42 +344,6 @@ namespace Softadastra
             {
                 throw std::runtime_error("Erreur lors de la récupération de l'utilisateur : " + std::string(e.what()));
             }
-        }
-
-        std::vector<User> findAll()
-        {
-            std::vector<User> users;
-
-            try
-            {
-                std::shared_ptr<sql::Connection> con = getDbConnection();
-                if (!con)
-                {
-                    throw std::runtime_error("La connexion à la base de données a échoué.");
-                }
-
-                std::unique_ptr<sql::PreparedStatement> pstmt(con->prepareStatement("SELECT * FROM test_user"));
-                std::shared_ptr<sql::ResultSet> res(pstmt->executeQuery());
-
-                while (res->next())
-                {
-                    User user;
-                    user.setId(res->getInt("id"));
-                    user.setFullName(res->getString("full_name"));
-                    user.setEmail(res->getString("email"));
-                    users.push_back(user);
-                }
-            }
-            catch (const sql::SQLException &e)
-            {
-                throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
-            }
-            catch (const std::exception &e)
-            {
-                throw std::runtime_error("Erreur lors de la récupération des utilisateurs : " + std::string(e.what()));
-            }
-
-            return users;
         }
     };
 }
