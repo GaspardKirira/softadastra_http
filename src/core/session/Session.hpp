@@ -17,7 +17,7 @@ namespace Softadastra
     using tcp = net::ip::tcp;
     using json = nlohmann::json;
 
-    constexpr size_t MAX_REQUEST_SIZE = 8192;
+    // constexpr size_t MAX_REQUEST_SIZE = 8192;
     constexpr size_t MAX_REQUEST_BODY_SIZE = 10 * 1024 * 1024; // 10 Mo
 
     /**

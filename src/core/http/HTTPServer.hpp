@@ -57,9 +57,9 @@ namespace Softadastra
         explicit HTTPServer(Config &config);
         ~HTTPServer();
 
-        void handle_signals();
+        // void handle_signals();
 
-        void stop();
+        // void stop();
 
         /**
          * @brief Starts the server and begins accepting incoming connections.
@@ -92,14 +92,14 @@ namespace Softadastra
 
         void close_socket(std::shared_ptr<tcp::socket> socket);
 
-        Config &config_;                                        ///< Configuration object for the server settings.
-        std::shared_ptr<net::io_context> io_context_;           ///< I/O context for asynchronous operations.
-        std::unique_ptr<tcp::acceptor> acceptor_;               ///< Acceptor for accepting incoming TCP connections.
-        Router router_;                                         ///< Router used to route HTTP requests.
-        std::unique_ptr<RouteConfigurator> route_configurator_; ///< Configurator for setting up routes.
+        Config &config_;
+        std::shared_ptr<net::io_context> io_context_;
+        std::unique_ptr<tcp::acceptor> acceptor_;
+        Router router_;
+        std::unique_ptr<RouteConfigurator> route_configurator_;
 
-        Softadastra::ThreadPool request_thread_pool_; ///< Thread pool for handling incoming requests.
-        std::vector<std::thread> io_threads_;         ///< Threads for running the I/O context.
+        Softadastra::ThreadPool request_thread_pool_;
+        std::vector<std::thread> io_threads_;
 
         std::atomic<bool> stop_requested_;
     };
