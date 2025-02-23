@@ -13,7 +13,7 @@ namespace Softadastra
 
         void configure(Router &router) override
         {
-            add_route(router, http::verb::get, "/test",
+            add_route(router, http::verb::get, "/",
                       [this](const http::request<http::string_body> &,
                              http::response<http::string_body> &res)
                       {

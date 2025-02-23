@@ -3,14 +3,15 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/core.hpp>
 #include <spdlog/spdlog.h>
+#include <regex>
 
 namespace Softadastra
 {
 
     Session::Session(tcp::socket socket, Router &router)
-        : socket_(std::move(socket)), router_(router), buffer_(8060), req_()
+        : socket_(std::move(socket)), router_(router)
     {
-        // spdlog::info("Session initialized for client: {}", socket_.remote_endpoint().address().to_string());
+        socket_.set_option(tcp::no_delay(true)); // Désactiver le buffering de TCP
     }
 
     Session::~Session() {}
@@ -30,8 +31,9 @@ namespace Softadastra
         }
 
         auto self = shared_from_this();
-        buffer_.consume(buffer_.size());
+        buffer_.consume(buffer_.size()); // Nettoyer le buffer avant la lecture
 
+        // Timer pour la gestion du timeout
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
         timer->expires_after(std::chrono::seconds(5));
 
@@ -51,25 +53,34 @@ namespace Softadastra
                 close_socket();
             } });
 
+        // Lecture de la requête HTTP
         http::async_read(socket_, buffer_, req_,
                          [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
                          {
-                             timer->cancel();
+                             timer->cancel(); // Annuler le timeout car une requête est reçue
+
                              if (ec)
                              {
-                                 if (ec == boost::asio::error::eof)
+                                 if (ec == http::error::end_of_stream)
                                  {
-                                     spdlog::info("Connection closed cleanly by peer.");
+                                     spdlog::info("Client closed the connection.");
                                  }
                                  else if (ec != boost::asio::error::operation_aborted)
                                  {
                                      spdlog::error("Error during async_read: {}", ec.message());
                                  }
-                                 close_socket();
+                                 close_socket(); // Fermer proprement
                                  return;
                              }
 
                              spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
+
+                             // Ajouter "Connection: keep-alive" pour éviter les fermetures immédiates
+                             if (req_[http::field::connection] != "close")
+                             {
+                                 http::response<http::string_body> res;
+                                 res.set(http::field::connection, "keep-alive");
+                             }
 
                              handle_request(ec);
                          });
@@ -80,6 +91,13 @@ namespace Softadastra
         if (ec)
         {
             spdlog::error("Error handling request: {}", ec.message());
+            return;
+        }
+
+        if (!waf_check_request(req_))
+        {
+            spdlog::warn("Request blocked by WAF.");
+            send_error("Request blocked due to security policy");
             return;
         }
 
@@ -134,16 +152,11 @@ namespace Softadastra
                                   return;
                               }
 
-                              static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
-                              auto now = std::chrono::steady_clock::now();
-                              if (now - last_log_time > std::chrono::seconds(10))
-                              {
-                                  spdlog::info("Response sent successfully.");
-                                  last_log_time = now;
-                              }
+                              spdlog::info("Response sent successfully.");
 
-                              socket_.shutdown(tcp::socket::shutdown_both);
-                              socket_.close();
+                              // Attendre un peu avant de fermer le socket
+                              net::post(socket_.get_executor(), [this, self]()
+                                        { close_socket(); });
                           });
     }
 
@@ -157,61 +170,56 @@ namespace Softadastra
 
     void Session::close_socket()
     {
-        boost::system::error_code ignored_ec;
+        if (!socket_.is_open())
+        {
+            spdlog::warn("Socket already closed or not open.");
+            return;
+        }
+
+        boost::system::error_code ec;
+
+        // Shutdown proprement avant de fermer
+        socket_.shutdown(tcp::socket::shutdown_both, ec);
+        if (ec && ec != boost::asio::error::not_connected)
+        {
+            spdlog::warn("Error during socket shutdown: {}", ec.message());
+        }
+
+        // Vérifier si le socket est encore ouvert avant de le fermer
         if (socket_.is_open())
         {
-            socket_.close(ignored_ec);
-            if (ignored_ec)
+            socket_.close(ec);
+            if (ec)
             {
-                spdlog::warn("Error closing socket: {}", ignored_ec.message());
+                spdlog::warn("Error closing socket: {}", ec.message());
             }
             else
             {
                 spdlog::info("Socket closed.");
             }
         }
-        else
-        {
-            spdlog::warn("Socket already closed or not open.");
-        }
     }
 
     bool Session::waf_check_request(const http::request<http::string_body> &req)
     {
-        // Détection d'une attaque XSS
-        if (req.target().find("<script>") != std::string::npos)
+        std::regex xss_pattern(R"(<script.*?>.*?</script>)", std::regex::icase);
+        std::regex sql_pattern(R"((\bUNION\b|\bSELECT\b|\bINSERT\b|\bDELETE\b|\bUPDATE\b|\bDROP\b))", std::regex::icase);
+
+        if (std::regex_search(req.target().to_string(), xss_pattern))
         {
             spdlog::warn("Possible XSS attack detected in URL: {}", req.target());
             return false;
         }
 
-        // Détection d'une injection SQL simple
-        if (req.body().find("SELECT * FROM") != std::string::npos)
+        if (std::regex_search(req.body(), sql_pattern))
         {
             spdlog::warn("Possible SQL injection detected in body: {}", req.body());
             return false;
         }
 
-        // Vérification de la taille du corps de la requête
         if (req.body().size() > MAX_REQUEST_BODY_SIZE)
         {
             spdlog::warn("Request body too large: {} bytes", req.body().size());
-            return false;
-        }
-
-        // Détection d'un User-Agent suspect
-        if (req.find("User-Agent") != req.end() &&
-            req["User-Agent"].find("curl") != std::string::npos &&
-            req["User-Agent"].find("8.5.0") == std::string::npos) // Exclure certaines versions de curl
-        {
-            spdlog::warn("Suspicious User-Agent detected: {}", req["User-Agent"]);
-            return false;
-        }
-
-        // Vérification de la présence de certains en-têtes suspects (par exemple, Origin ou Referer)
-        if (req.find("Origin") != req.end() || req.find("Referer") != req.end())
-        {
-            spdlog::warn("Suspicious Origin or Referer headers detected.");
             return false;
         }
 
