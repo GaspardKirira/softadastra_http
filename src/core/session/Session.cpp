@@ -7,30 +7,22 @@
 namespace Softadastra
 {
 
-    // Constructeur modifié pour accepter un tcp::socket
     Session::Session(tcp::socket socket, Router &router)
         : socket_(std::move(socket)), router_(router), buffer_(8060), req_()
     {
-        spdlog::info("Session initialized for client: {}", socket_.remote_endpoint().address().to_string());
+        // spdlog::info("Session initialized for client: {}", socket_.remote_endpoint().address().to_string());
     }
 
-    Session::~Session()
-    {
-        // Réduit la verbosité des destructions
-        // std::cout << "Session: Destroyed" << std::endl;  // Plus de log sur la destruction
-    }
+    Session::~Session() {}
 
     void Session::run()
     {
         auto self = shared_from_this();
-
-        // Suppression du SSL handshake, car nous utilisons une connexion non sécurisée aujourd'hui
         read_request();
     }
 
     void Session::read_request()
     {
-        // Vérifie si le socket est ouvert avant de procéder
         if (!socket_.is_open())
         {
             spdlog::error("Socket is not open, cannot read request!");
@@ -38,9 +30,8 @@ namespace Softadastra
         }
 
         auto self = shared_from_this();
-        buffer_.consume(buffer_.size()); // Vide le buffer avant la nouvelle lecture
+        buffer_.consume(buffer_.size());
 
-        // Crée un timer de 5 secondes pour éviter les délais trop longs
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
         timer->expires_after(std::chrono::seconds(5));
 
@@ -60,33 +51,28 @@ namespace Softadastra
                 close_socket();
             } });
 
-        // Démarre la lecture asynchrone de la requête
-        boost::beast::http::async_read(socket_, buffer_, req_,
-                                       [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
-                                       {
-                                           timer->cancel(); // Annule le timer si la lecture s'est terminée avant le délai
+        http::async_read(socket_, buffer_, req_,
+                         [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
+                         {
+                             timer->cancel();
+                             if (ec)
+                             {
+                                 if (ec == boost::asio::error::eof)
+                                 {
+                                     spdlog::info("Connection closed cleanly by peer.");
+                                 }
+                                 else if (ec != boost::asio::error::operation_aborted)
+                                 {
+                                     spdlog::error("Error during async_read: {}", ec.message());
+                                 }
+                                 close_socket();
+                                 return;
+                             }
 
-                                           if (ec)
-                                           {
-                                               // Vérifie si l'erreur est une fermeture propre de la connexion (EOF)
-                                               if (ec == boost::asio::error::eof)
-                                               {
-                                                   spdlog::info("Connection closed cleanly by peer.");
-                                               }
-                                               else if (ec != boost::asio::error::operation_aborted)
-                                               {
-                                                   spdlog::error("Error during async_read: {}", ec.message());
-                                               }
-                                               close_socket(); // Ferme le socket si une erreur se produit
-                                               return;
-                                           }
+                             spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
 
-                                           // Log détaillé pour la réussite de la lecture
-                                           spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
-
-                                           // Passe à la gestion de la requête
-                                           handle_request(ec);
-                                       });
+                             handle_request(ec);
+                         });
     }
 
     void Session::handle_request(const boost::system::error_code &ec)
@@ -97,24 +83,23 @@ namespace Softadastra
             return;
         }
 
-        // Checking request body size, and enforce limits like payload size.
-        if (req_.body().size() > MAX_REQUEST_SIZE)
+        if (req_.body().size() > MAX_REQUEST_BODY_SIZE)
         {
             spdlog::warn("Request too large: {} bytes", req_.body().size());
             send_error("Request too large");
             return;
         }
 
-        boost::beast::http::response<boost::beast::http::string_body> res;
+        http::response<http::string_body> res;
         bool success = router_.handle_request(req_, res);
 
         if (!success)
         {
-            if (res.result() == boost::beast::http::status::method_not_allowed)
+            if (res.result() == http::status::method_not_allowed)
             {
                 send_error("Method Not Allowed");
             }
-            else if (res.result() == boost::beast::http::status::not_found)
+            else if (res.result() == http::status::not_found)
             {
                 send_error("Route Not Found");
             }
@@ -128,7 +113,7 @@ namespace Softadastra
         send_response(res);
     }
 
-    void Session::send_response(boost::beast::http::response<boost::beast::http::string_body> &res)
+    void Session::send_response(http::response<http::string_body> &res)
     {
         if (!socket_.is_open())
         {
@@ -137,37 +122,35 @@ namespace Softadastra
         }
 
         auto self = shared_from_this();
-        auto res_ptr = std::make_shared<boost::beast::http::response<boost::beast::http::string_body>>(std::move(res));
+        auto res_ptr = std::make_shared<http::response<http::string_body>>(std::move(res));
 
-        boost::beast::http::async_write(socket_, *res_ptr,
-                                        [this, self, res_ptr](boost::system::error_code ec, std::size_t)
-                                        {
-                                            if (ec)
-                                            {
-                                                spdlog::error("Error sending response: {}", ec.message());
-                                                // Ici tu peux décider de fermer le socket en cas d'erreur d'écriture
-                                                close_socket();
-                                                return;
-                                            }
+        http::async_write(socket_, *res_ptr,
+                          [this, self, res_ptr](boost::system::error_code ec, std::size_t)
+                          {
+                              if (ec)
+                              {
+                                  spdlog::error("Error sending response: {}", ec.message());
+                                  close_socket();
+                                  return;
+                              }
 
-                                            // Limiter la fréquence des logs pour les réponses envoyées
-                                            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
-                                            auto now = std::chrono::steady_clock::now();
-                                            if (now - last_log_time > std::chrono::seconds(10))
-                                            {
-                                                spdlog::info("Response sent successfully.");
-                                                last_log_time = now;
-                                            }
+                              static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
+                              auto now = std::chrono::steady_clock::now();
+                              if (now - last_log_time > std::chrono::seconds(10))
+                              {
+                                  spdlog::info("Response sent successfully.");
+                                  last_log_time = now;
+                              }
 
-                                            socket_.shutdown(tcp::socket::shutdown_both);
-                                            socket_.close();
-                                        });
+                              socket_.shutdown(tcp::socket::shutdown_both);
+                              socket_.close();
+                          });
     }
 
     void Session::send_error(const std::string &error_message)
     {
-        boost::beast::http::response<boost::beast::http::string_body> res;
-        Response::error_response(res, boost::beast::http::status::bad_request, error_message);
+        http::response<http::string_body> res;
+        Response::error_response(res, http::status::bad_request, error_message);
 
         send_response(res);
     }
@@ -180,7 +163,6 @@ namespace Softadastra
             socket_.close(ignored_ec);
             if (ignored_ec)
             {
-                // Réduit les logs sur la fermeture du socket
                 spdlog::warn("Error closing socket: {}", ignored_ec.message());
             }
             else
@@ -194,7 +176,7 @@ namespace Softadastra
         }
     }
 
-    bool Session::waf_check_request(const boost::beast::http::request<boost::beast::http::string_body> &req)
+    bool Session::waf_check_request(const http::request<http::string_body> &req)
     {
         // Détection d'une attaque XSS
         if (req.target().find("<script>") != std::string::npos)

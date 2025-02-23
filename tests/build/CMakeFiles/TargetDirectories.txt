@@ -1,0 +1,3 @@
+/home/softadastra/softadastra_http/tests/build/CMakeFiles/prog.dir
+/home/softadastra/softadastra_http/tests/build/CMakeFiles/edit_cache.dir
+/home/softadastra/softadastra_http/tests/build/CMakeFiles/rebuild_cache.dir

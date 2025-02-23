@@ -5,18 +5,12 @@
 
 namespace Softadastra
 {
-    Router::~Router()
-    {
-        std::cout << "Router: Destroyed" << std::endl;
-    }
+    Router::~Router() {}
 
     void Router::add_route(http::verb method, const std::string &route, std::shared_ptr<IRequestHandler> handler)
     {
-        // Ajouter la route au routeur
         routes_[{method, route}] = std::move(handler);
-
-        // Ajouter le motif de la route à la liste des motifs
-        route_patterns_.push_back(route); // Ajout automatique de la route au vecteur
+        route_patterns_.push_back(route);
     }
 
     bool Router::handle_request(const http::request<http::string_body> &req, http::response<http::string_body> &res)
@@ -28,7 +22,6 @@ namespace Softadastra
             spdlog::info("Received {} request for path '{}'", req.method_string(), req.target());
         }
 
-        // Gestion des OPTIONS (pour CORS)
         if (req.method() == http::verb::options)
         {
             if (!is_production)
@@ -43,7 +36,6 @@ namespace Softadastra
             return true;
         }
 
-        // Vérifier si la méthode HTTP est valide
         if (req.method() != http::verb::get && req.method() != http::verb::post && req.method() != http::verb::put &&
             req.method() != http::verb::delete_ && req.method() != http::verb::patch && req.method() != http::verb::head)
         {
@@ -51,14 +43,12 @@ namespace Softadastra
             res.result(http::status::method_not_allowed);
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", "Method Not Allowed"}}.dump();
-            return false; // Retourner immédiatement après avoir géré l'erreur
+            return false;
         }
 
-        // Vérifier si la route existe pour la méthode HTTP donnée
         bool route_exists = false;
         bool method_allowed = false;
 
-        // Rechercher dans les routes existantes
         for (const auto &[route_key, handler] : routes_)
         {
             if (route_key.second == std::string(req.target()))
@@ -73,7 +63,6 @@ namespace Softadastra
             }
         }
 
-        // Vérifier les routes dynamiques
         bool matched = false;
         for (auto &[route_key, handler] : routes_)
         {
@@ -89,7 +78,6 @@ namespace Softadastra
             return true;
         }
 
-        // Si la route existe mais que la méthode n'est pas autorisée
         if (route_exists && !method_allowed)
         {
             spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
@@ -99,7 +87,6 @@ namespace Softadastra
             return false;
         }
 
-        // Si aucune route ne correspond, retourner "Route not found"
         spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
         res.result(http::status::not_found);
         res.set(http::field::content_type, "application/json");
@@ -121,9 +108,8 @@ namespace Softadastra
             std::unordered_map<std::string, std::string> params;
             spdlog::info("Extracted parameters:");
 
-            size_t param_count = 1; // Commence à 1 pour éviter le premier groupe (qui est l'URL entière)
+            size_t param_count = 1;
 
-            // Extraire les paramètres dynamiques
             for (size_t start = 0; (start = route_pattern.find('{', start)) != std::string::npos;)
             {
                 size_t end = route_pattern.find('}', start);
@@ -140,13 +126,11 @@ namespace Softadastra
                 }
             }
 
-            // Validation des paramètres extraits
             if (!validate_parameters(params, res))
             {
                 return false;
             }
 
-            // Assurez-vous que le gestionnaire peut gérer les paramètres extraits
             auto dynamic_handler = std::dynamic_pointer_cast<DynamicRequestHandler>(handler);
             if (dynamic_handler)
             {
@@ -228,18 +212,18 @@ namespace Softadastra
             {
                 inside_placeholder = true;
                 param_name.clear();
-                regex += "("; // Début du paramètre dynamique
+                regex += "(";
             }
             else if (c == '}')
             {
                 inside_placeholder = false;
-                regex += "[^/]+)"; // Capture une partie de l'URL jusqu'au prochain "/"
+                regex += "[^/]+)";
             }
             else
             {
                 if (inside_placeholder)
                 {
-                    param_name += c; // Construire le nom du paramètre
+                    param_name += c;
                 }
                 else
                 {
@@ -254,7 +238,7 @@ namespace Softadastra
                 }
             }
         }
-        regex += "$"; // Fin de l'URL
+        regex += "$";
         return regex;
     }
 

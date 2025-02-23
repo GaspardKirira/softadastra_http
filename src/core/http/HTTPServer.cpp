@@ -17,21 +17,17 @@ namespace Softadastra
           acceptor_(nullptr),
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)),
-          // Initialisation correcte du ThreadPool avec tous les paramètres requis
           request_thread_pool_(NUMBER_OF_THREADS, 100, 20, std::chrono::milliseconds(1000)), // max_queue_size = 100, max_dynamic_threads = 20, timeout = 1000ms
           io_threads_()
     {
         try
         {
-            // Validation du port
             int newPort = config_.getServerPort();
             if (newPort < 1024 || newPort > 65535)
             {
-                spdlog::error("Invalid port number: {}. Must be between 1024 and 65535.", newPort);
                 throw std::invalid_argument("Port number out of range (1024-65535)");
             }
 
-            // Configuration de l'acceptor avec gestion d'erreurs détaillées
             tcp::endpoint endpoint(boost::asio::ip::address_v4::any(), static_cast<unsigned short>(newPort));
             acceptor_ = std::make_unique<tcp::acceptor>(*io_context_);
 
@@ -71,11 +67,7 @@ namespace Softadastra
         }
     }
 
-    HTTPServer::~HTTPServer()
-    {
-        // Réduction des logs dans le destructeur
-        // std::cout << "HTTPServer: Destroyed" << std::endl; // Suppression de l'info sur la destruction
-    }
+    HTTPServer::~HTTPServer() {}
 
     void HTTPServer::run()
     {
@@ -86,7 +78,6 @@ namespace Softadastra
             spdlog::info("Softadastra/master server is running at http://127.0.0.1:{} using {} threads", config_.getServerPort(), NUMBER_OF_THREADS);
             spdlog::info("Waiting for incoming connections...");
 
-            // Démarrer l'acceptation des connexions (avant de lancer les threads)
             start_accept();
 
             for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
@@ -103,7 +94,6 @@ namespace Softadastra
                     }
                     spdlog::info("Thread {} finished.", i); });
             }
-            // Attendre que tous les threads aient terminé
             for (auto &t : io_threads_)
             {
                 if (t.joinable())
@@ -127,7 +117,6 @@ namespace Softadastra
                                     {
                                         if (!ec)
                                         {
-                                            // Log réduit sur l'acceptation de connexion
                                             static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
                                             auto now = std::chrono::steady_clock::now();
                                             if (now - last_log_time > std::chrono::seconds(10))
@@ -153,8 +142,7 @@ namespace Softadastra
                                             spdlog::error("Error accepting connection from client: {} (Error code: {})", ec.message(), ec.value());
                                         }
 
-                                        start_accept(); // Continue accepting new connections
-                                    });
+                                        start_accept(); });
         }
         catch (const std::exception &e)
         {
@@ -182,15 +170,14 @@ namespace Softadastra
     {
         try
         {
-            spdlog::info("Starting client session for: {}", socket_ptr->remote_endpoint().address().to_string());
+            // spdlog::info("Starting client session for: {}", socket_ptr->remote_endpoint().address().to_string());
             auto session = std::make_shared<Session>(std::move(*socket_ptr), router);
             session->run();
         }
         catch (const std::exception &e)
         {
             spdlog::error("Error in client session for client {}: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
-            socket_ptr->close(); // Attempt to close the socket if error occurs
-            // Log réduit sur l'échec de la session
+            socket_ptr->close();
             static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
             auto now = std::chrono::steady_clock::now();
             if (now - last_log_time > std::chrono::seconds(10))
