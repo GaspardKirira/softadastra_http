@@ -8,6 +8,7 @@
 #include "http/Response.hpp"
 
 using json = nlohmann::json;
+
 namespace Softadastra
 {
     class UnifiedRequestHandler : public IRequestHandler
@@ -21,6 +22,10 @@ namespace Softadastra
 
         void handle_request(const http::request<http::string_body> &req, http::response<http::string_body> &res) override
         {
+            // Vérification de l'en-tête Connection pour déterminer si la connexion doit rester ouverte
+            bool keep_alive = (req[http::field::connection] == "keep-alive") ||
+                              (req.version() == 11 && req[http::field::connection].empty());
+
             if (req.method() == http::verb::get)
             {
                 std::unordered_map<std::string, std::string> params = extract_dynamic_params_public(std::string(req.target()));
@@ -58,6 +63,19 @@ namespace Softadastra
                 }
                 handler_(req, res);
             }
+
+            // Ajoutez l'en-tête Connection à la réponse
+            if (keep_alive)
+            {
+                res.set(http::field::connection, "keep-alive");
+            }
+            else
+            {
+                res.set(http::field::connection, "close");
+            }
+
+            // Préparez la réponse et envoyez-la
+            res.prepare_payload();
         }
 
         static std::unordered_map<std::string, std::string> extract_dynamic_params_public(const std::string &target)

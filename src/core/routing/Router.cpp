@@ -19,14 +19,14 @@ namespace Softadastra
 
         if (!is_production)
         {
-            spdlog::info("Received {} request for path '{}'", req.method_string(), req.target());
+            // spdlog::info("Received {} request for path '{}'", req.method_string(), req.target());
         }
 
         if (req.method() == http::verb::options)
         {
             if (!is_production)
             {
-                spdlog::info("Handling OPTIONS request for path '{}'", req.target());
+                // spdlog::info("Handling OPTIONS request for path '{}'", req.target());
             }
 
             res.result(http::status::no_content);
@@ -80,14 +80,14 @@ namespace Softadastra
 
         if (route_exists && !method_allowed)
         {
-            spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
+            // spdlog::warn("Method '{}' is not allowed for path '{}'", req.method_string(), req.target());
             res.result(http::status::method_not_allowed);
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", "Method Not Allowed"}}.dump();
             return false;
         }
 
-        spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
+        // spdlog::warn("Route not found for method '{}' and path '{}'", req.method_string(), req.target());
         res.result(http::status::not_found);
         res.set(http::field::content_type, "application/json");
         res.body() = json{{"message", "Route not found"}}.dump();
@@ -99,7 +99,7 @@ namespace Softadastra
                                        const http::request<http::string_body> &req)
     {
         std::string regex_pattern = convert_route_to_regex(route_pattern);
-        spdlog::info("Checking if path '{}' matches pattern '{}'", path, regex_pattern);
+        // spdlog::info("Checking if path '{}' matches pattern '{}'", path, regex_pattern);
         boost::regex dynamic_route(regex_pattern);
         boost::smatch match;
 
