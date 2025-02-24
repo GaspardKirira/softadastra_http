@@ -18,7 +18,8 @@ namespace Softadastra
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)),
           request_thread_pool_(NUMBER_OF_THREADS, 100, 20, std::chrono::milliseconds(1000)), // max_queue_size = 100, max_dynamic_threads = 20, timeout = 1000ms
-          io_threads_()
+          io_threads_(),
+          stop_requested_()
     {
         try
         {
@@ -121,7 +122,6 @@ namespace Softadastra
                                             auto now = std::chrono::steady_clock::now();
                                             if (now - last_log_time > std::chrono::seconds(10))
                                             {
-                                                spdlog::info("Client connected from: {}", socket->remote_endpoint().address().to_string());
                                                 last_log_time = now;
                                             }
 
@@ -170,7 +170,6 @@ namespace Softadastra
     {
         try
         {
-            // spdlog::info("Starting client session for: {}", socket_ptr->remote_endpoint().address().to_string());
             auto session = std::make_shared<Session>(std::move(*socket_ptr), router);
             session->run();
         }

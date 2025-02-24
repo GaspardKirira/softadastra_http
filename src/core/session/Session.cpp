@@ -9,9 +9,9 @@ namespace Softadastra
 {
 
     Session::Session(tcp::socket socket, Router &router)
-        : socket_(std::move(socket)), router_(router)
+        : socket_(std::move(socket)), router_(router), buffer_(), req_()
     {
-        socket_.set_option(tcp::no_delay(true)); // Désactiver le buffering de TCP
+        socket_.set_option(tcp::no_delay(true));
     }
 
     Session::~Session() {}
@@ -31,11 +31,10 @@ namespace Softadastra
         }
 
         auto self = shared_from_this();
-        buffer_.consume(buffer_.size()); // Nettoyer le buffer avant la lecture
+        buffer_.consume(buffer_.size());
 
-        // Timer pour la gestion du timeout
         auto timer = std::make_shared<boost::asio::steady_timer>(socket_.get_executor());
-        timer->expires_after(std::chrono::seconds(5));
+        timer->expires_after(std::chrono::seconds(20));
 
         std::weak_ptr<boost::asio::steady_timer> weak_timer = timer;
         timer->async_wait([this, self, weak_timer](boost::system::error_code ec)
@@ -43,7 +42,7 @@ namespace Softadastra
             auto timer = weak_timer.lock();
             if (!timer)
             {
-                spdlog::info("Timer is no longer available.");
+               //spdlog::info("Timer is no longer available.");
                 return;
             }
     
@@ -57,13 +56,13 @@ namespace Softadastra
         http::async_read(socket_, buffer_, req_,
                          [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
                          {
-                             timer->cancel(); // Annuler le timeout car une requête est reçue
+                             timer->cancel();
 
                              if (ec)
                              {
                                  if (ec == http::error::end_of_stream)
                                  {
-                                     spdlog::info("Client closed the connection.");
+                                     // spdlog::info("Client closed the connection.");
                                  }
                                  else if (ec != boost::asio::error::operation_aborted)
                                  {
@@ -73,7 +72,7 @@ namespace Softadastra
                                  return;
                              }
 
-                             spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
+                             // spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
 
                              // Ajouter "Connection: keep-alive" pour éviter les fermetures immédiates
                              if (req_[http::field::connection] != "close")
@@ -152,7 +151,7 @@ namespace Softadastra
                                   return;
                               }
 
-                              spdlog::info("Response sent successfully.");
+                              // spdlog::info("Response sent successfully.");
 
                               // Attendre un peu avant de fermer le socket
                               net::post(socket_.get_executor(), [this, self]()
@@ -195,7 +194,7 @@ namespace Softadastra
             }
             else
             {
-                spdlog::info("Socket closed.");
+                // spdlog::info("Socket closed.");
             }
         }
     }
