@@ -20,6 +20,12 @@ namespace Softadastra
                           Response::success_response(res, "Hello from test");
                       });
 
+            add_route(router, http::verb::get, "test",
+                      [](const http::request<http::string_body> &req, http::response<http::string_body> &res)
+                      {
+                          Response::success_response(res, "heelo form test");
+                      });
+
             add_route(router, http::verb::put, "/update_user/{id}",
                       [this](const http::request<http::string_body> &req, http::response<http::string_body> &res)
                       {

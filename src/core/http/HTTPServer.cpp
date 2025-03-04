@@ -17,7 +17,8 @@ namespace Softadastra
           acceptor_(nullptr),
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)),
-          request_thread_pool_(NUMBER_OF_THREADS, 100, 20, std::chrono::milliseconds(1000)), // max_queue_size = 100, max_dynamic_threads = 20, timeout = 1000ms
+          request_thread_pool_(NUMBER_OF_THREADS, 100, 20, std::chrono::milliseconds(1000)),
+          // max_queue_size = 100, max_dynamic_threads = 20, timeout = 1000ms
           io_threads_(),
           stop_requested_()
     {

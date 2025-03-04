@@ -29,7 +29,7 @@ namespace Softadastra
         {
             res.result(status);
             res.set(http::field::content_type, content_type);
-            res.set(http::field::server, "Softadastra/master");
+            res.set(http::field::server, "Softadastra");
             auto now = std::chrono::system_clock::now();
             std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
             std::tm tm = *std::gmtime(&now_time_t);
@@ -62,7 +62,7 @@ namespace Softadastra
             res.result(http::status::no_content);
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", message}}.dump();
-            res.set(http::field::server, "Softadastra/master");
+            res.set(http::field::server, "Softadastra");
             auto now = std::chrono::system_clock::now();
             std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
             std::tm tm = *std::gmtime(&now_time_t);
@@ -79,7 +79,7 @@ namespace Softadastra
             res.set(http::field::location, location);
             res.set(http::field::content_type, "application/json");
             res.body() = json{{"message", "Redirecting to " + location}}.dump();
-            res.set(http::field::server, "Softadastra/master");
+            res.set(http::field::server, "Softadastra");
             auto now = std::chrono::system_clock::now();
             std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
             std::tm tm = *std::gmtime(&now_time_t);
@@ -95,7 +95,7 @@ namespace Softadastra
             res.result(http::status::ok);
             res.set(http::field::content_type, "application/json");
             res.body() = data.dump();
-            res.set(http::field::server, "Softadastra/master");
+            res.set(http::field::server, "Softadastra");
             auto now = std::chrono::system_clock::now();
             std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
             std::tm tm = *std::gmtime(&now_time_t);
