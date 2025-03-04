@@ -54,7 +54,7 @@ namespace Softadastra
 
         // Lecture de la requête HTTP
         http::async_read(socket_, buffer_, req_,
-                         [this, self, timer](boost::system::error_code ec, std::size_t bytes_transferred)
+                         [this, self, timer](boost::system::error_code ec, std::size_t)
                          {
                              timer->cancel();
 
