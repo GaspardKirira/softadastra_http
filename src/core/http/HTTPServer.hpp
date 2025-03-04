@@ -44,6 +44,7 @@ namespace Softadastra
         ~HTTPServer();
         void run();
         void start_accept();
+        int calculate_io_thread_count();
 
     private:
         void handle_client(std::shared_ptr<tcp::socket> socket_ptr, Router &router);

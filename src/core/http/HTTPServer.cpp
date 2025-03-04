@@ -1,5 +1,5 @@
-#include "threading/ThreadPool.hpp"
 #include "HTTPServer.hpp"
+#include "ThreadPool.hpp"
 #include <memory>
 #include <thread>
 #include <vector>
@@ -11,16 +11,26 @@
 
 namespace Softadastra
 {
+    // Helper function for setting thread CPU affinity
+    void set_affinity(int thread_id)
+    {
+#ifdef __linux__
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(thread_id % std::thread::hardware_concurrency(), &cpuset);
+        pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
+    }
+
     HTTPServer::HTTPServer(Config &config)
         : config_(config),
           io_context_(std::make_shared<net::io_context>()),
           acceptor_(nullptr),
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)),
-          request_thread_pool_(NUMBER_OF_THREADS, 100, 20, std::chrono::milliseconds(1000)),
-          // max_queue_size = 100, max_dynamic_threads = 20, timeout = 1000ms
+          request_thread_pool_(NUMBER_OF_THREADS, 100, 0, std::chrono::milliseconds(1000)),
           io_threads_(),
-          stop_requested_()
+          stop_requested_(false)
     {
         try
         {
@@ -82,12 +92,18 @@ namespace Softadastra
 
             start_accept();
 
-            for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
+            // Dynamically adjust the number of io_context threads based on load
+            int num_io_threads = calculate_io_thread_count();
+            spdlog::info("Starting {} io_context threads", num_io_threads);
+
+            // Start io_context threads with affinity and dynamic thread count
+            for (std::size_t i = 0; i < num_io_threads; ++i)
             {
                 io_threads_.emplace_back([this, i]()
                                          {
                     try
                     {
+                        set_affinity(i); // Set the CPU affinity for this thread
                         io_context_->run();
                     }
                     catch (const std::exception &e)
@@ -96,6 +112,7 @@ namespace Softadastra
                     }
                     spdlog::info("Thread {} finished.", i); });
             }
+
             for (auto &t : io_threads_)
             {
                 if (t.joinable())
@@ -109,6 +126,15 @@ namespace Softadastra
         }
     }
 
+    // Function to calculate the number of io_context threads based on system load
+    int HTTPServer::calculate_io_thread_count()
+    {
+        // In a real implementation, we could use system metrics to adjust dynamically
+        // For example, measuring CPU load or network traffic
+        // For simplicity, we return a value here that could be dynamically adjusted
+        return std::max(1, static_cast<int>(std::thread::hardware_concurrency() / 2));
+    }
+
     void HTTPServer::start_accept()
     {
         auto socket = std::make_shared<tcp::socket>(*io_context_);
@@ -119,24 +145,14 @@ namespace Softadastra
                                     {
                                         if (!ec)
                                         {
-                                            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
-                                            auto now = std::chrono::steady_clock::now();
-                                            if (now - last_log_time > std::chrono::seconds(10))
-                                            {
-                                                last_log_time = now;
-                                            }
-
-                                            request_thread_pool_.enqueue([this, socket]()
-                                                                         {
-                                                try
-                                                {
+                                            request_thread_pool_.enqueue(1, [this, socket]() {
+                                                try {
                                                     handle_client(socket, router_);
-                                                }
-                                                catch (const std::exception &e)
-                                                {
+                                                } catch (const std::exception &e) {
                                                     spdlog::error("Error handling client: {}", e.what());
                                                     close_socket(socket);
-                                                } });
+                                                }
+                                            });
                                         }
                                         else
                                         {
@@ -178,13 +194,6 @@ namespace Softadastra
         {
             spdlog::error("Error in client session for client {}: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
             socket_ptr->close();
-            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
-            auto now = std::chrono::steady_clock::now();
-            if (now - last_log_time > std::chrono::seconds(10))
-            {
-                spdlog::error("Session handler failed for client {} with exception: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
-                last_log_time = now;
-            }
         }
     }
 
