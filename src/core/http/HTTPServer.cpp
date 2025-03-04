@@ -17,10 +17,9 @@ namespace Softadastra
           acceptor_(nullptr),
           router_(),
           route_configurator_(std::make_unique<RouteConfigurator>(router_)),
-          request_thread_pool_(NUMBER_OF_THREADS, 100, 20, std::chrono::milliseconds(1000)),
-          // max_queue_size = 100, max_dynamic_threads = 20, timeout = 1000ms
+          request_thread_pool_(NUM_THREADS, 100, 20, std::chrono::milliseconds(1000)),
           io_threads_(),
-          stop_requested_()
+          stop_requested_(false)
     {
         try
         {
@@ -37,28 +36,28 @@ namespace Softadastra
             acceptor_->open(endpoint.protocol(), ec);
             if (ec)
             {
-                spdlog::error("Failed to open acceptor socket: {} (Error code: {})", ec.message(), ec.value());
+                log_error("Failed to open acceptor socket", ec);
                 throw std::system_error(ec, "Could not open the acceptor socket");
             }
 
             acceptor_->set_option(boost::asio::socket_base::reuse_address(true), ec);
             if (ec)
             {
-                spdlog::error("Failed to set socket option: {} (Error code: {})", ec.message(), ec.value());
+                log_error("Failed to set socket option", ec);
                 throw std::system_error(ec, "Could not set socket option");
             }
 
             acceptor_->bind(endpoint, ec);
             if (ec)
             {
-                spdlog::error("Failed to bind to the server port: {} (Error code: {})", ec.message(), ec.value());
+                log_error("Failed to bind to the server port", ec);
                 throw std::system_error(ec, "Could not bind to the server port");
             }
 
             acceptor_->listen(boost::asio::socket_base::max_connections, ec);
             if (ec)
             {
-                spdlog::error("Failed to listen on the server port: {} (Error code: {})", ec.message(), ec.value());
+                log_error("Failed to listen on the server port", ec);
                 throw std::system_error(ec, "Could not listen on the server port");
             }
         }
@@ -77,12 +76,12 @@ namespace Softadastra
         {
             route_configurator_->configure_routes();
 
-            spdlog::info("Softadastra/master server is running at http://127.0.0.1:{} using {} threads", config_.getServerPort(), NUMBER_OF_THREADS);
+            spdlog::info("Softadastra/master server is running at http://127.0.0.1:{} using {} threads", config_.getServerPort(), NUM_THREADS);
             spdlog::info("Waiting for incoming connections...");
 
             start_accept();
 
-            for (std::size_t i = 0; i < NUMBER_OF_THREADS; ++i)
+            for (std::size_t i = 0; i < NUM_THREADS; ++i)
             {
                 io_threads_.emplace_back([this, i]()
                                          {
@@ -96,11 +95,13 @@ namespace Softadastra
                     }
                     spdlog::info("Thread {} finished.", i); });
             }
+
             for (auto &t : io_threads_)
             {
                 if (t.joinable())
                     t.join();
             }
+
             spdlog::info("All io_context threads finished.");
         }
         catch (const std::exception &e)
@@ -119,13 +120,6 @@ namespace Softadastra
                                     {
                                         if (!ec)
                                         {
-                                            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
-                                            auto now = std::chrono::steady_clock::now();
-                                            if (now - last_log_time > std::chrono::seconds(10))
-                                            {
-                                                last_log_time = now;
-                                            }
-
                                             request_thread_pool_.enqueue([this, socket]()
                                                                          {
                                                 try
@@ -140,10 +134,13 @@ namespace Softadastra
                                         }
                                         else
                                         {
-                                            spdlog::error("Error accepting connection from client: {} (Error code: {})", ec.message(), ec.value());
+                                            log_error("Error accepting connection from client", ec);
                                         }
 
-                                        start_accept(); });
+                                        if (!stop_requested_)
+                                        {
+                                            start_accept(); // Continue accepting new connections
+                                        } });
         }
         catch (const std::exception &e)
         {
@@ -158,12 +155,12 @@ namespace Softadastra
         socket->shutdown(tcp::socket::shutdown_both, ec);
         if (ec && ec != boost::system::error_code{})
         {
-            spdlog::error("Failed to shutdown socket: {} (Error code: {})", ec.message(), ec.value());
+            log_error("Failed to shutdown socket", ec);
         }
         socket->close(ec);
         if (ec && ec != boost::system::error_code{})
         {
-            spdlog::error("Failed to close socket: {} (Error code: {})", ec.message(), ec.value());
+            log_error("Failed to close socket", ec);
         }
     }
 
@@ -178,14 +175,25 @@ namespace Softadastra
         {
             spdlog::error("Error in client session for client {}: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
             socket_ptr->close();
-            static std::chrono::steady_clock::time_point last_log_time = std::chrono::steady_clock::now();
-            auto now = std::chrono::steady_clock::now();
-            if (now - last_log_time > std::chrono::seconds(10))
-            {
-                spdlog::error("Session handler failed for client {} with exception: {}", socket_ptr->remote_endpoint().address().to_string(), e.what());
-                last_log_time = now;
-            }
         }
     }
 
-} // namespace Softadastra
+    void HTTPServer::log_error(const std::string &msg, const boost::system::error_code &ec)
+    {
+        spdlog::error("{}: {} (Error code: {})", msg, ec.message(), ec.value());
+    }
+
+    void HTTPServer::shutdown()
+    {
+        stop_requested_ = true;
+        io_context_->stop(); // Stop the io_context to terminate threads
+        for (auto &thread : io_threads_)
+        {
+            if (thread.joinable())
+            {
+                thread.join();
+            }
+        }
+        spdlog::info("Server shutdown completed");
+    }
+}

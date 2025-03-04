@@ -1,12 +1,13 @@
-#include <pthread.h>
 #include <spdlog/spdlog.h>
 #include <atomic>
 #include <chrono>
 #include <mutex>
 #include <condition_variable>
-#include <queue>
+#include <deque>
 #include <functional>
 #include <vector>
+#include <thread>
+#include <iostream>
 #include "ThreadPool.hpp"
 
 namespace Softadastra
@@ -25,40 +26,27 @@ namespace Softadastra
           condition(),
           stop_flag(false)
     {
-        const size_t stack_size = 8 * 1024 * 1024;
         for (std::size_t i = 0; i < num_threads; ++i)
         {
-            pthread_t thread;
-            pthread_attr_t attr;
-            pthread_attr_init(&attr);
-            pthread_attr_setstacksize(&attr, stack_size);
-            int result = pthread_create(&thread, &attr, &ThreadPool::worker_thread, this);
-            if (result != 0)
-            {
-                spdlog::error("Failed to create thread with custom stack size: {}", result);
-                continue;
-            }
-            workers.push_back(thread);
+            workers.push_back(std::thread(&ThreadPool::worker_thread, this));
         }
     }
 
-    void *ThreadPool::worker_thread(void *arg)
+    void ThreadPool::worker_thread()
     {
-        ThreadPool *pool = static_cast<ThreadPool *>(arg);
-
         while (true)
         {
             std::function<void()> task;
             {
-                std::unique_lock<std::mutex> lock(pool->queue_mutex);
-                pool->condition.wait(lock, [pool]
-                                     { return pool->stop_flag || !pool->task_queue.empty(); });
+                std::unique_lock<std::mutex> lock(queue_mutex);
+                condition.wait(lock, [this]
+                               { return stop_flag || !task_queue.empty(); });
 
-                if (pool->stop_flag && pool->task_queue.empty())
-                    return nullptr;
+                if (stop_flag && task_queue.empty())
+                    return;
 
-                task = std::move(pool->task_queue.front());
-                pool->task_queue.pop();
+                task = std::move(task_queue.front());
+                task_queue.pop_front();
             }
 
             try
@@ -69,13 +57,21 @@ namespace Softadastra
             {
                 spdlog::error("Exception in thread pool worker: {}", e.what());
             }
-            if (pool->task_queue.size() < pool->max_queue_size / 2 && pool->workers.size() > pool->current_threads)
+
+            // Réduire le nombre de threads dynamiques si la queue est vide et que nous avons trop de threads
             {
-                spdlog::info("Scaling down threads...");
+                std::unique_lock<std::mutex> lock(queue_mutex);
+                if (task_queue.size() < max_queue_size / 2 && current_threads > workers.size())
+                {
+                    spdlog::info("Scaling down threads...");
+                    if (workers.size() > current_threads)
+                    {
+                        workers.back().join();
+                        workers.pop_back();
+                    }
+                }
             }
         }
-
-        return nullptr;
     }
 
     bool ThreadPool::enqueue(std::function<void()> task)
@@ -84,24 +80,12 @@ namespace Softadastra
             std::lock_guard<std::mutex> lock(queue_mutex);
             if (task_queue.size() >= max_queue_size)
             {
-                if (workers.size() < max_dynamic_threads)
+                if (current_threads.load() < max_dynamic_threads)
                 {
-                    pthread_t thread;
-                    pthread_attr_t attr;
-                    pthread_attr_init(&attr);
-                    pthread_attr_setstacksize(&attr, 8 * 1024 * 1024);
-                    int result = pthread_create(&thread, &attr, &ThreadPool::worker_thread, this);
-                    if (result == 0)
-                    {
-                        workers.push_back(thread);
-                        ++current_threads;
-                        return true;
-                    }
-                    else
-                    {
-                        spdlog::error("Failed to create dynamic thread with custom stack size: {}", result);
-                        return false;
-                    }
+                    workers.push_back(std::thread(&ThreadPool::worker_thread, this));
+                    current_threads.fetch_add(1);
+                    spdlog::info("Added new dynamic thread.");
+                    return true;
                 }
                 else
                 {
@@ -109,34 +93,39 @@ namespace Softadastra
                     if (condition.wait_for(lock, timeout, [this]
                                            { return task_queue.size() < max_queue_size || stop_flag; }))
                     {
-                        task_queue.push(std::move(task));
+                        task_queue.push_back(std::move(task));
                         return true;
                     }
                     else
                     {
+                        spdlog::warn("Queue full and timeout reached.");
                         return false;
                     }
                 }
             }
-
-            task_queue.push(std::move(task));
+            task_queue.push_back(std::move(task));
         }
 
-        condition.notify_one();
+        condition.notify_all();
         return true;
     }
 
     void ThreadPool::stop()
     {
         {
-            std::lock_guard<std::mutex> lock(queue_mutex);
+            std::lock_guard<std::mutex> lock(stop_mutex);
             stop_flag = true;
         }
         condition.notify_all();
-        for (pthread_t &worker : workers)
+        for (std::thread &worker : workers)
         {
-            pthread_join(worker, nullptr);
+            if (worker.joinable())
+                worker.join();
         }
     }
-    ThreadPool::~ThreadPool() { stop(); }
+
+    ThreadPool::~ThreadPool()
+    {
+        stop();
+    }
 } // namespace Softadastra

@@ -9,7 +9,7 @@
 #include <functional>
 #include <atomic>
 #include <chrono>
-#include <pthread.h> // Pour utiliser pthread et définir la taille de la pile
+#include <deque>
 
 namespace Softadastra
 {
@@ -33,10 +33,10 @@ namespace Softadastra
 
     private:
         // Méthode exécutée par chaque thread dans le pool
-        static void *worker_thread(void *arg);
+        void worker_thread();
 
         // Liste des threads du pool
-        std::vector<pthread_t> workers;
+        std::vector<std::thread> workers;
 
         // Taille maximale de la queue de tâches
         std::size_t max_queue_size;
@@ -48,10 +48,10 @@ namespace Softadastra
         std::chrono::milliseconds timeout;
 
         // Nombre actuel de threads dans le pool
-        std::size_t current_threads;
+        std::atomic<std::size_t> current_threads;
 
         // Queue de tâches à traiter
-        std::queue<std::function<void()>> task_queue;
+        std::deque<std::function<void()>> task_queue;
 
         // Mutex pour protéger l'accès à la queue
         std::mutex queue_mutex;
@@ -61,6 +61,9 @@ namespace Softadastra
 
         // Flag pour arrêter les threads
         std::atomic<bool> stop_flag;
+
+        // Mutex pour arrêter les threads de manière sûre
+        std::mutex stop_mutex;
     };
 } // namespace Softadastra
 
