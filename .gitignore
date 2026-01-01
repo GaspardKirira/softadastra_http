@@ -4,3 +4,8 @@ readme.txt
 text.txt
 certs.txt
 
+
+# secrets / certs
+certs/
+sertificat-auto-signe.txt
+architecture.txt
