@@ -22,7 +22,6 @@ namespace Softadastra
 
         void handle_request(const http::request<http::string_body> &req, http::response<http::string_body> &res) override
         {
-            // Vérification de l'en-tête Connection pour déterminer si la connexion doit rester ouverte
             bool keep_alive = (req[http::field::connection] == "keep-alive") ||
                               (req.version() == 11 && req[http::field::connection].empty());
 
@@ -64,7 +63,6 @@ namespace Softadastra
                 handler_(req, res);
             }
 
-            // Ajoutez l'en-tête Connection à la réponse
             if (keep_alive)
             {
                 res.set(http::field::connection, "keep-alive");
@@ -74,7 +72,6 @@ namespace Softadastra
                 res.set(http::field::connection, "close");
             }
 
-            // Préparez la réponse et envoyez-la
             res.prepare_payload();
         }
 

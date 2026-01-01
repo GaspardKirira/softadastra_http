@@ -11,7 +11,6 @@
 
 namespace Softadastra
 {
-    // Helper function for setting thread CPU affinity
     void set_affinity(int thread_id)
     {
 #ifdef __linux__
@@ -92,18 +91,16 @@ namespace Softadastra
 
             start_accept();
 
-            // Dynamically adjust the number of io_context threads based on load
             int num_io_threads = calculate_io_thread_count();
             spdlog::info("Starting {} io_context threads", num_io_threads);
 
-            // Start io_context threads with affinity and dynamic thread count
             for (std::size_t i = 0; i < num_io_threads; ++i)
             {
                 io_threads_.emplace_back([this, i]()
                                          {
                     try
                     {
-                        set_affinity(i); // Set the CPU affinity for this thread
+                        set_affinity(i); 
                         io_context_->run();
                     }
                     catch (const std::exception &e)
@@ -126,12 +123,8 @@ namespace Softadastra
         }
     }
 
-    // Function to calculate the number of io_context threads based on system load
     int HTTPServer::calculate_io_thread_count()
     {
-        // In a real implementation, we could use system metrics to adjust dynamically
-        // For example, measuring CPU load or network traffic
-        // For simplicity, we return a value here that could be dynamically adjusted
         return std::max(1, static_cast<int>(std::thread::hardware_concurrency() / 2));
     }
 

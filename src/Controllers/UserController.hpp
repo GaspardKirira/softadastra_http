@@ -133,12 +133,10 @@ namespace Softadastra
                                      {
                                          try
                                          {
-                                             // Récupérer l'ID de l'utilisateur à partir de l'URL
                                              std::stringstream ss(params.at("id"));
                                              int id{};
                                              ss >> id;
 
-                                             // Vérifier que le corps de la requête contient les champs nécessaires
                                              json request_json;
                                              try
                                              {
@@ -161,10 +159,8 @@ namespace Softadastra
                                                  return;
                                              }
 
-                                             // Appeler la fonction updateUser pour mettre à jour l'utilisateur dans la base de données
                                              User updated_user = self->updateUser(id, request_json["firstname"], request_json["email"]);
 
-                                             // Répondre avec un message de succès et les informations de l'utilisateur mis à jour
                                              Softadastra::Response::json_response(res, updated_user.to_json());
                                          }
                                          catch (const std::exception &e)
@@ -175,13 +171,12 @@ namespace Softadastra
         }
 
     public:
-        // 2. Vérification explicite de la validité de la connexion
         std::shared_ptr<sql::Connection> getDbConnection()
         {
             try
             {
                 Config &config = Config::getInstance();
-                config.loadConfigOnce(); // Charger la config une seule fois
+                config.loadConfigOnce();
                 return config.getDbConnection();
             }
             catch (const std::exception &e)
@@ -190,7 +185,6 @@ namespace Softadastra
             }
         }
 
-        // 3. Vérification de la validité avant l'utilisation
         std::vector<User> findAll()
         {
             std::vector<User> users;
@@ -198,7 +192,7 @@ namespace Softadastra
             try
             {
                 std::shared_ptr<sql::Connection> con = getDbConnection();
-                if (!con || !con->isValid()) // Vérification explicite de la validité
+                if (!con || !con->isValid())
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");
                 }
@@ -269,32 +263,26 @@ namespace Softadastra
         {
             try
             {
-                // Se connecter à la base de données
                 std::shared_ptr<sql::Connection> con = getDbConnection();
                 if (!con)
                 {
                     throw std::runtime_error("La connexion à la base de données a échoué.");
                 }
 
-                // Préparer la requête SQL UPDATE
                 std::unique_ptr<sql::PreparedStatement> pstmt(
                     con->prepareStatement("UPDATE test_user SET full_name = ?, email = ? WHERE id = ?"));
 
-                // Lier les paramètres (full_name, email et user_id)
                 pstmt->setString(1, full_name);
                 pstmt->setString(2, email);
                 pstmt->setInt(3, user_id);
 
-                // Exécuter la requête UPDATE
                 int rows_affected = pstmt->executeUpdate();
 
-                // Si aucune ligne n'a été affectée, cela signifie que l'utilisateur n'existe pas
                 if (rows_affected == 0)
                 {
                     throw std::runtime_error("Aucun utilisateur trouvé avec cet ID.");
                 }
 
-                // Récupérer les informations mises à jour
                 User updated_user;
                 updated_user.setId(user_id);
                 updated_user.setFullName(full_name);

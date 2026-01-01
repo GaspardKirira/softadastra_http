@@ -48,7 +48,6 @@ namespace Softadastra
                               return;
                           }
 
-                          // Valider le corps de la requête (JSON attendu)
                           if (req.body().empty())
                           {
                               Response::error_response(res, http::status::bad_request, "Empty request body.");
@@ -66,7 +65,6 @@ namespace Softadastra
                               return;
                           }
 
-                          // Vérification du champ 'username'
                           if (request_json.find("username") == request_json.end())
                           {
                               Response::error_response(res, http::status::bad_request, "Le champ 'username' est manquant.");

@@ -12,7 +12,7 @@ Config::Config()
     : db_host("localhost"),
       db_user("root"),
       db_pass(),
-      db_name("web243_adastra"),
+      db_name("http_db"),
       db_port(3306),
       server_port(8080)
 {

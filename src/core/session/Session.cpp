@@ -42,7 +42,7 @@ namespace Softadastra
             auto timer = weak_timer.lock();
             if (!timer)
             {
-               //spdlog::info("Timer is no longer available.");
+               spdlog::info("Timer is no longer available.");
                 return;
             }
     
@@ -52,7 +52,6 @@ namespace Softadastra
                 close_socket();
             } });
 
-        // Lecture de la requête HTTP
         http::async_read(socket_, buffer_, req_,
                          [this, self, timer](boost::system::error_code ec, std::size_t)
                          {
@@ -62,19 +61,18 @@ namespace Softadastra
                              {
                                  if (ec == http::error::end_of_stream)
                                  {
-                                     // spdlog::info("Client closed the connection.");
+                                     spdlog::info("Client closed the connection.");
                                  }
                                  else if (ec != boost::asio::error::operation_aborted)
                                  {
                                      spdlog::error("Error during async_read: {}", ec.message());
                                  }
-                                 close_socket(); // Fermer proprement
+                                 close_socket();
                                  return;
                              }
 
-                             // spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
+                             //  spdlog::info("Request read successfully ({} bytes)", bytes_transferred);
 
-                             // Ajouter "Connection: keep-alive" pour éviter les fermetures immédiates
                              if (req_[http::field::connection] != "close")
                              {
                                  http::response<http::string_body> res;
@@ -151,9 +149,8 @@ namespace Softadastra
                                   return;
                               }
 
-                              // spdlog::info("Response sent successfully.");
+                              spdlog::info("Response sent successfully.");
 
-                              // Attendre un peu avant de fermer le socket
                               net::post(socket_.get_executor(), [this, self]()
                                         { close_socket(); });
                           });
@@ -177,14 +174,12 @@ namespace Softadastra
 
         boost::system::error_code ec;
 
-        // Shutdown proprement avant de fermer
         socket_.shutdown(tcp::socket::shutdown_both, ec);
         if (ec && ec != boost::asio::error::not_connected)
         {
             spdlog::warn("Error during socket shutdown: {}", ec.message());
         }
 
-        // Vérifier si le socket est encore ouvert avant de le fermer
         if (socket_.is_open())
         {
             socket_.close(ec);
@@ -194,7 +189,7 @@ namespace Softadastra
             }
             else
             {
-                // spdlog::info("Socket closed.");
+                spdlog::info("Socket closed.");
             }
         }
     }

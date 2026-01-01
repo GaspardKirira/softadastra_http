@@ -1,3 +1,0 @@
-/home/softadastra/softadastra/softadastra_http/hash/build/CMakeFiles/main.dir
-/home/softadastra/softadastra/softadastra_http/hash/build/CMakeFiles/edit_cache.dir
-/home/softadastra/softadastra/softadastra_http/hash/build/CMakeFiles/rebuild_cache.dir

@@ -1,4 +1,3 @@
-// Hash.hpp
 #ifndef HASH_HPP
 #define HASH_HPP
 

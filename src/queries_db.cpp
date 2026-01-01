@@ -1,4 +1,3 @@
-// src/database/queries/ProductQueries.hpp
 #pragma once
 #include <string>
 #include <memory>

@@ -9,27 +9,15 @@
 
 namespace Softadastra
 {
-    /**
-     * @class Controller
-     * @brief Classe de base pour définir les routes dans l'application.
-     */
     class Controller
     {
     public:
         explicit Controller(Config &config) : config_(config) {}
-
         virtual ~Controller() = default;
-
         virtual void configure(Router &router) = 0;
 
     protected:
-        Config &config_; ///< Référence à la configuration utilisée par le contrôleur.
-
-        /**
-         * @brief Méthode générique pour ajouter une route.
-         *
-         * Permet d'ajouter des routes avec une fonction de gestion spécifiée.
-         */
+        Config &config_;
         template <typename Handler>
         void add_route(Router &router, http::verb method, const std::string &path, Handler handler)
         {
